@@ -2,11 +2,14 @@ name: Real backends
 
 # Genuine inference against real System One backends: upstream Kev serving a pinned
 # checkpoint on the runner, and TypeSafe's Jev through OpenRouter. Manual only, so model
-# downloads and paid API calls never run on every commit. Once selected, the tests fail
-# (never skip) when the server, checkpoint or credential is missing.
+# downloads and paid API calls never run on every commit: start it from the Actions tab,
+# or add the `real-backends` label to a pull request from this repository. Once selected,
+# the tests fail (never skip) when the server, checkpoint or credential is missing.
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: read
@@ -26,6 +29,7 @@ env:
 jobs:
   kev:
     name: REAL KEV (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'real-backends'
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +108,7 @@ jobs:
 
   jev:
     name: REAL JEV (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'real-backends'
     strategy:
       fail-fast: false
       matrix:
