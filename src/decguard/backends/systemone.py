@@ -87,20 +87,12 @@ class SystemOneBackend(HttpBackend):
         settings = validate_settings(SystemOneSettings, config, name=name)
         if not config.model:
             raise ContractError(f"systemone backend {name!r}: 'model' is required")
-        if settings.label_map:
-            if decision.type is DecisionType.NOUL:
-                raise ContractError(
-                    f"systemone backend {name!r}: label_map does not apply to noul decisions "
-                    "(no labels are sent)"
-                )
-            unknown = sorted(set(settings.label_map.values()) - set(decision.labels))
-            if unknown:
-                raise ContractError(
-                    f"systemone backend {name!r}: label_map targets {unknown} are not "
-                    "contract labels"
-                )
-            if len(set(settings.label_map.values())) != len(settings.label_map):
-                raise ContractError(f"systemone backend {name!r}: label_map maps two labels to one")
+        if settings.label_map and decision.type is DecisionType.NOUL:
+            raise ContractError(
+                f"systemone backend {name!r}: label_map does not apply to noul decisions "
+                "(no labels are sent)"
+            )
+        cls._check_label_map(settings, decision, name=name)
         return cls(settings, decision=decision, name=name, model=config.model)
 
     def predict(self, request: DecisionRequest) -> Prediction:

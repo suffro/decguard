@@ -56,3 +56,11 @@ jobs:
 - `--fail-on-warn` turns warning gates into failures, for a stricter main branch.
 - `decguard check` is offline: schedule the same command in cron or Actions after your own
   collection/export job. DecGuard does not ingest telemetry or need service credentials.
+
+## Real-backend compatibility (this repository)
+
+DecGuard's own `Real backends` workflow (`.github/workflows/real-backends.yml`) makes genuine
+decisions through a Kev server started on the runner and through Jev on OpenRouter, on Ubuntu
+and macOS. It is manual (`workflow_dispatch`, or the `real-backends` label on a pull request)
+and passes `OPENROUTER_API_KEY` from repository secrets to the Jev test step only. See
+[backends](backends.md#real-backend-validation) for running the same checks locally.

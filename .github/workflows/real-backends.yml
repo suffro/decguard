@@ -48,6 +48,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          # Kev's locked torch stack is several GB; PyPI is faster than an Actions cache.
+          enable-cache: false
       - name: Keep model weights outside the checkout
         run: echo "HF_HOME=$RUNNER_TEMP/hf" >> "$GITHUB_ENV"
       - name: Cache the pinned Kev checkpoint and base model

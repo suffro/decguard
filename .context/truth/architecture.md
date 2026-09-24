@@ -23,7 +23,9 @@ explicit policies and SDK) are implemented.
 - `datasets.py`: golden cases from JSONL/JSON (`id`, `input`, optional `expected`,
   `metadata`), validated against the contract labels; file hash.
 - `backends/`: `DecisionBackend` base (`predict` implemented by adapters; shared `decide`,
-  `metadata`, `healthcheck`, `close`), built-ins `mock` and `http`, `CallableBackend` (SDK
+  `metadata`, `healthcheck`, `close`), built-ins `mock`, `http` (`decguard.http/0.1`) and
+  `systemone` (TypeSafe System One wire format: Kev, Jev, OpenRouter Decisions API; a thin
+  `http` subclass, see `decisions/systemone-builtin-backend.md`), `CallableBackend` (SDK
   only), and `registry.py` (built-ins + `decguard.backends` entry points).
 - `runner.py`: runs cases with a bounded thread pool, keeps dataset order, turns
   `BackendError`s and unexpected plugin exceptions into per-case `CaseError`s; other
@@ -67,10 +69,15 @@ policy → action directive (fallback is not invoked automatically).
 
 ## External systems
 
-- Decision backends over HTTP (`decguard.http/0.1`, docs/backends.md) or installed
-  plugins. None is needed for the default test suite; a local stdlib HTTP server backs the
-  integration tests. Real endpoints are opt-in (`pytest -m external`).
-- GitHub Actions CI (`.github/workflows/ci.yml`).
+- Decision backends over HTTP (`decguard.http/0.1` or System One, docs/backends.md) or
+  installed plugins. None is needed for the default test suite; a local stdlib HTTP server
+  backs the integration tests.
+- Real backends, opt-in only: a self-hosted Kev server (upstream `jaredpalmer/kev`, Kev-0.8B
+  at a pinned revision) and Jev via OpenRouter (`typesafe/jev-1.13`, `OPENROUTER_API_KEY`),
+  exercised by `pytest -m real_kev` / `-m real_jev`; any other endpoint by
+  `pytest -m external`.
+- GitHub Actions: `.github/workflows/ci.yml` (every PR/push to main) and
+  `.github/workflows/real-backends.yml` (manual or `real-backends` PR label; Ubuntu + macOS).
 
 ## Important constraints
 
@@ -79,9 +86,9 @@ policy → action directive (fallback is not invoked automatically).
 - Malformed backend output and invalid dataset rows are errors, never repaired or dropped.
 - Metrics are deterministic (`math.fsum`, dataset order); the mock backend's hash output is
   pinned by a test.
-- Credentials only via environment variables; authenticated healthchecks stay on the
-  backend origin; common secret-like metadata keys are redacted; secrets never appear in
-  reports or HTTP error text.
+- Credentials only via environment variables (GitHub Secrets in workflows); authenticated
+  healthchecks stay on the backend origin; common secret-like metadata keys are redacted;
+  secrets never appear in reports or HTTP error text (asserted against real OpenRouter).
 - Contracts never execute code (safe YAML, no import paths).
 - Fuzz runs are reproducible from the stored seed; transformation generation is pinned by
   tests (see `decisions/metamorphic-engine-design.md`).

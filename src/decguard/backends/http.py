@@ -142,15 +142,22 @@ class HttpBackend(DecisionBackend):
     @classmethod
     def from_config(cls, config: BackendConfig, *, name: str, decision: DecisionSpec) -> Self:
         settings = validate_settings(HttpSettings, config, name=name)
+        cls._check_label_map(settings, decision, name=name)
+        return cls(settings, name=name, model=config.model)
+
+    @classmethod
+    def _check_label_map(cls, settings: HttpSettings, decision: DecisionSpec, *, name: str) -> None:
         targets = list(settings.label_map.values())
         unknown = sorted(set(targets) - set(decision.labels))
         if unknown:
             raise ContractError(
-                f"http backend {name!r}: label_map targets {unknown} are not contract labels"
+                f"{cls.provider} backend {name!r}: label_map targets {unknown} are not "
+                "contract labels"
             )
         if len(set(targets)) != len(targets):
-            raise ContractError(f"http backend {name!r}: label_map maps two labels to one")
-        return cls(settings, name=name, model=config.model)
+            raise ContractError(
+                f"{cls.provider} backend {name!r}: label_map maps two labels to one"
+            )
 
     def _headers(self) -> dict[str, str]:
         headers = {"User-Agent": f"decguard/{__version__}", **self.settings.headers}

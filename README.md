@@ -10,7 +10,8 @@ report** with CI-friendly PASS / WARN / FAIL gates.
 > Status: v0.1 release candidate (`0.1.0`), not yet tagged or published. Contracts,
 > backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
 > regression/replay, offline post-deployment checks, explicit cascade policies and the
-> Python SDK are implemented.
+> Python SDK are implemented. The `systemone` backend is validated end to end against a
+> real Kev-0.8B server and real Jev through OpenRouter, on Linux and macOS.
 
 ## 5-minute quickstart
 
@@ -47,7 +48,7 @@ decision:
   options: [refund, reject, review]
 
 backend:
-  provider: http              # or: mock, or an installed plugin
+  provider: http              # or: systemone (Kev, Jev), mock, an installed plugin
   url: https://decisions.internal/v1/decide
   model: open-jev-2b
   bearer_token_env: DECISIONS_TOKEN
@@ -166,7 +167,7 @@ A full workflow with a regression diff is in [docs/ci.md](docs/ci.md).
 ## Documentation
 
 - [Decision Contract reference](docs/contracts.md)
-- [Backends and the HTTP protocol](docs/backends.md)
+- [Backends: System One (Kev, Jev), HTTP, plugins](docs/backends.md)
 - [Reports, metrics and gates](docs/reports.md)
 - [Metamorphic properties, fuzzing and replay](docs/properties.md)
 - [Regression diffs](docs/regression.md)

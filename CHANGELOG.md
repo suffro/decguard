@@ -67,6 +67,17 @@ versioned separately.
 - Explicit deterministic `policy` routes for `accept`, `abstain`, named-backend `fallback`
   and `human_review`, exposed by `decguard run` and the embeddable `DecGuard` Python API.
   Fallback is a directive and is never invoked or optimized implicitly.
+- `systemone` backend for System One decision APIs: self-hosted Kev servers, TypeSafe's
+  Jev, and Jev through OpenRouter's Decisions API. It covers:
+  - choice options sent as `criteria`, noul `noul` as the positive label's probability,
+    score level indices mapped back to the ordered levels;
+  - strict answer checks (question, type, most probable choice, score legend);
+  - the served model, request id, upstream provider and usage/cost as provenance;
+  - HTTP 429/529 retries, on top of the `http` backend's.
+- Opt-in `real_kev` / `real_jev` tests with genuine inference (Kev-0.8B at a pinned
+  revision; `typesafe/jev-1.13` on OpenRouter), and a manual `Real backends` workflow
+  running them on Ubuntu and macOS. Selected tests fail, never skip, without their
+  server, checkpoint or credential.
 
 ### Changed
 

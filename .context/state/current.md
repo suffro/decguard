@@ -2,10 +2,9 @@
 
 ## Current focus
 
-Final v0.1 release validation following `DECGUARD_V0.1_CODEX_PLAN.md` (this directory).
-Steps 1–3 are merged. Release hardening is in progress on branch
-`v0.1-release-validation`; do not tag or publish until it is merged and the real-backend
-blocker below is cleared.
+Closing the last v0.1 release blocker on branch `v0.1-real-backends` (PR #5): genuine
+decisions through real Kev and real Jev. Steps 1–3 and release validation are merged to
+`main`. Do not tag, publish or create the GitHub release until PR #5 is merged.
 
 ## Recent relevant changes
 
@@ -26,22 +25,26 @@ blocker below is cleared.
   authenticated healthchecks cannot cross origins, and secret-like metadata is redacted;
   the wheel metadata is `0.1.0`; the runnable demo covers calibration, regression and
   production drift.
-- Local release checks pass: lint/format/type checks, 276 tests (the external test is the
-  one intentional skip), the complete 0/1/2 workflow, and clean-wheel smoke on Python
-  3.11, 3.12 and 3.13. Runtime dependency metadata contains only compatible permissive
-  licenses plus Certifi's MPL-2.0; `uv.lock` is current and every registry artifact is
-  hash-pinned.
+- Real backends: built-in `systemone` backend (TypeSafe System One wire format) for Kev,
+  Jev and OpenRouter's Decisions API; opt-in `real_kev` / `real_jev` tests
+  (`tests/integration/test_real_backends.py`, contracts in `tests/integration/real/`); the
+  manual `Real backends` workflow (Ubuntu + macOS, Python 3.13). Pinned: Kev commit
+  `09ff745d52a0`, checkpoint `jaredpalmer/kev-0.8b@9a45d25eb2ab`, Jev `typesafe/jev-1.13`
+  (served as `typesafe/jev-1.13-20260917`).
+- Local release checks pass: lint/format/type checks, 313 tests (8 intentional opt-in
+  skips: `external`, `real_kev`, `real_jev`), the complete 0/1/2 workflow, and clean-wheel
+  smoke. Earlier validation covered Python 3.11, 3.12 and 3.13. Runtime dependency
+  metadata contains only compatible permissive licenses plus Certifi's MPL-2.0; `uv.lock`
+  is current and every registry artifact is hash-pinned. No runtime dependency was added
+  for the real backends.
 
 ## Next
 
-- Complete PR review and the Linux/macOS CI matrix.
-- Then run the opt-in real-backend test before tagging. Do not publish or tag from the
-  validation branch.
+- Merge PR #5 once standard CI and the `Real backends` workflow are green on its head.
+- Then tag `v0.1.0` and publish; neither is done yet.
 
 ## Blockers
 
-- The sole release blocker is one successful opt-in call to a real decision backend. It
-  requires either a reachable endpoint implementing `decguard.http/0.1`, or an installed
-  plugin/proxy translating a real TypeSafe/Kev-style `POST /v1/systemone` service to that
-  protocol, plus environment-provided credentials where required. Run it with
-  `DECGUARD_EXTERNAL_CONTRACT=/absolute/path/to/contract uv run pytest -m external`.
+- None known once PR #5's CI and real-backend runs are green. To re-run the real-backend
+  check: add the `real-backends` label to the PR (or, after merge, `workflow_dispatch`);
+  it needs the repository secret `OPENROUTER_API_KEY`.
