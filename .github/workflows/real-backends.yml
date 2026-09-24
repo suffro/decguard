@@ -60,10 +60,11 @@ jobs:
       - name: Install upstream Kev
         working-directory: kev-upstream
         run: uv sync --locked --extra serve
+      # The venv's own Python, not `uv run`: a long-lived `uv run` holds uv's cache lock.
       - name: Start Kev
         working-directory: kev-upstream
         run: |
-          nohup uv run --locked --extra serve python -m kev.serve \
+          nohup .venv/bin/python -m kev.serve \
             --run "$KEV_RUN" --port 8009 > "$RUNNER_TEMP/kev.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/kev.pid"
       - name: Wait until Kev has loaded the checkpoint
@@ -91,12 +92,13 @@ jobs:
           DECGUARD_KEV_RUN: ${{ env.KEV_RUN }}
           DECGUARD_REAL_REPORTS: ${{ runner.temp }}/reports
         run: uv run pytest -m real_kev tests/integration/test_real_backends.py -v -s -p no:cacheprovider
-      - name: Show the reports
+      - name: Show the reports and stop Kev
         if: always()
         run: |
           for report in "$RUNNER_TEMP"/reports/*.json; do
             if [ -f "$report" ]; then uv run decguard report "$report"; fi
           done
+          if [ -f "$RUNNER_TEMP/kev.pid" ]; then kill "$(cat "$RUNNER_TEMP/kev.pid")" || true; fi
           tail -n 40 "$RUNNER_TEMP/kev.log"
       - uses: actions/upload-artifact@v4
         if: always()
