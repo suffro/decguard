@@ -39,6 +39,11 @@ backends:
       - contains: "used it for"
         probabilities: {refund: 0.03, reject: 0.93, review: 0.04}
     default: {refund: 0.20, reject: 0.15, review: 0.65}
+  # Named by the explicit policy below; the application decides whether to invoke it.
+  strong_model:
+    provider: mock
+    model: refund-strong-v1
+    default: {refund: 0.98, reject: 0.01, review: 0.01}
   staging:
     provider: http
     url: http://localhost:8080/decide
@@ -85,3 +90,24 @@ regression:
   max_accuracy_drop: 0.02
   max_ece_increase: 0.05
   segment_by: [locale]
+
+# Offline checks over records collected by the application itself.
+production:
+  segments: [locale]
+  requirements:
+    min_accuracy: 0.9
+    max_ece: 0.25
+    min_threshold_coverage: 0.5
+    max_fallback_rate: 0.6
+  segment_requirements:
+    min_accuracy: 0.8
+
+# Ordered, deterministic first-match routing. Fallback is a directive, not an automatic call.
+policy:
+  routes:
+    - when: {confidence_gte: 0.95}
+      action: accept
+    - when: {confidence_gte: 0.75}
+      action: fallback
+      backend: strong_model
+    - action: human_review

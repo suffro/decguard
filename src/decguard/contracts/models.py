@@ -7,6 +7,8 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from decguard._validation import StrictModel
+from decguard.contracts.policy import Policy
+from decguard.contracts.production import Production
 from decguard.contracts.properties import Fuzz, Properties, Regression
 from decguard.decisions.types import DecisionSpec, DecisionType
 from decguard.errors import ContractError
@@ -154,6 +156,10 @@ class Contract(StrictModel):
     fuzz: Fuzz = Fuzz()
     regression: Regression = Regression()
     """Gates applied by ``decguard diff``."""
+    production: Production = Production()
+    """Offline post-deployment checks and metadata segmentation."""
+    policy: Policy | None = None
+    """Ordered, first-match runtime routing policy."""
 
     @field_validator("schema_version", mode="before")
     @classmethod
@@ -205,6 +211,36 @@ class Contract(StrictModel):
             unknown = sorted(set(label_format.aliases) - set(labels))
             if unknown:
                 raise ValueError(f"properties.label_format.aliases: unknown labels {unknown}")
+        return self
+
+    @model_validator(mode="after")
+    def _check_production(self) -> Contract:
+        threshold_gates = {"min_threshold_coverage"}
+        sections = (
+            self.production.requirements,
+            self.production.warnings,
+            self.production.segment_requirements,
+            self.production.segment_warnings,
+        )
+        if self.evaluation.confidence_threshold is None and any(
+            threshold_gates & section.configured().keys() for section in sections
+        ):
+            raise ValueError(
+                "production min_threshold_coverage needs evaluation.confidence_threshold to be set"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_policy(self) -> Contract:
+        if self.policy is None:
+            return self
+        known = set(self.backend_names())
+        for index, route in enumerate(self.policy.routes):
+            if route.backend is not None and route.backend not in known:
+                raise ValueError(
+                    f"policy.routes.{index}.backend: unknown backend {route.backend!r}; "
+                    f"the contract defines: {', '.join(self.backend_names())}"
+                )
         return self
 
     def spec(self) -> DecisionSpec:

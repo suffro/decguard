@@ -6,6 +6,7 @@ error (including invalid command-line usage).
 
 from __future__ import annotations
 
+import json
 import os
 import traceback
 from collections.abc import Iterator
@@ -24,10 +25,14 @@ from decguard.errors import DecGuardError
 from decguard.fuzz.paraphrase import create_paraphraser
 from decguard.fuzz.replay import render_replay_text
 from decguard.fuzz.replay import replay as replay_failures
+from decguard.production.engine import run_check
+from decguard.production.render import render_production_text
+from decguard.production.report import ProductionReport, write_production_report
 from decguard.regression.diff import load_and_diff, render_diff_text, write_diff
 from decguard.reports.gates import Status
 from decguard.reports.model import Report, load_report, reevaluate, write_report
 from decguard.reports.render import render_text
+from decguard.sdk import DecGuard
 
 EXIT_PASS = 0
 EXIT_GATE_FAILED = 1
@@ -38,7 +43,8 @@ app = typer.Typer(
     help=(
         "Test, verify and gate probabilistic AI decision models.\n\n"
         "validate a contract, test it on a golden dataset, fuzz its metamorphic properties, "
-        "diff two runs for regressions, replay stored failures.\n\n"
+        "diff two runs for regressions, replay stored failures, check collected production "
+        "records, and apply explicit runtime policies.\n\n"
         "Exit codes: 0 = pass (or warn), 1 = reliability gate failed, "
         "2 = configuration/runtime error."
     ),
@@ -154,6 +160,12 @@ def validate(contract: ContractArg, dataset: DatasetOpt = None) -> None:
             f"warnings: {len(c.warnings.configured())}",
             "    properties "
             + (", ".join(c.properties.configured()) or "none (add 'properties' to fuzz)"),
+            "    production "
+            f"segments: {', '.join(c.production.segments) or 'none'}; "
+            f"requirements: {len(c.production.requirements.configured())}; "
+            f"segment requirements: {len(c.production.segment_requirements.configured())}",
+            "    policy     "
+            + (f"{len(c.policy.routes)} routes" if c.policy is not None else "none"),
             f"    hash      {loaded.hash}",
         ]
         typer.echo("\n".join(lines))
@@ -355,6 +367,96 @@ def replay(
             typer.echo(render_replay_text(result))
         if result.status is Status.FAIL:
             raise typer.Exit(EXIT_GATE_FAILED)
+
+
+def _emit_production(
+    report: ProductionReport,
+    fmt: OutputFormat,
+    output: Path | None,
+    fail_on_warn: bool,
+) -> None:
+    if output is not None:
+        write_production_report(report, output)
+        typer.echo(f"production report written to {output}", err=True)
+    if fmt is OutputFormat.JSON:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        typer.echo(render_production_text(report))
+    if report.status is Status.FAIL or (fail_on_warn and report.status is Status.WARN):
+        raise typer.Exit(EXIT_GATE_FAILED)
+
+
+@app.command()
+def check(
+    contract: ContractArg,
+    dataset: Annotated[
+        Path,
+        typer.Option(
+            "--dataset",
+            "-d",
+            help="Collected production records (.jsonl/.json).",
+            show_default=False,
+        ),
+    ],
+    baseline: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline",
+            help="Baseline production dataset or a previous `decguard check` JSON report.",
+        ),
+    ] = None,
+    output: OutputOpt = None,
+    fmt: FormatOpt = OutputFormat.TEXT,
+    fail_on_warn: FailOnWarnOpt = False,
+) -> None:
+    """Analyze collected production decisions offline and apply post-deployment gates."""
+    with _handle_errors():
+        result = run_check(contract, dataset=dataset, baseline=baseline)
+        _emit_production(result, fmt, output, fail_on_warn)
+
+
+@app.command("run")
+def run_policy(
+    contract: ContractArg,
+    input_value: Annotated[
+        str,
+        typer.Argument(
+            help="Decision input as text, or a JSON object when --input-json is set.",
+            show_default=False,
+        ),
+    ],
+    backend: BackendOpt = None,
+    input_json: Annotated[
+        bool,
+        typer.Option("--input-json", help="Parse INPUT_VALUE as a JSON object."),
+    ] = False,
+    case_id: Annotated[str, typer.Option("--id", help="Decision/correlation id.")] = "runtime",
+    fmt: FormatOpt = OutputFormat.TEXT,
+    healthcheck: HealthcheckOpt = True,
+) -> None:
+    """Make one decision and apply the contract's deterministic runtime policy."""
+    with _handle_errors():
+        input_data: str | dict[str, object] = input_value
+        if input_json:
+            try:
+                parsed = json.loads(input_value)
+            except ValueError as exc:
+                raise DecGuardError(f"--input-json is not valid JSON: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise DecGuardError("--input-json must decode to a JSON object")
+            input_data = parsed
+        with DecGuard.from_contract(contract, backend=backend, check_health=healthcheck) as guard:
+            decision = guard.decide(input_data, case_id=case_id)
+        if fmt is OutputFormat.JSON:
+            typer.echo(decision.model_dump_json(indent=2))
+        else:
+            suffix = (
+                f" -> {decision.fallback_backend}" if decision.fallback_backend is not None else ""
+            )
+            typer.echo(
+                f"{decision.action}{suffix} · selected {decision.result.selected} · "
+                f"confidence {decision.result.confidence:.3f} · route {decision.route_index}"
+            )
 
 
 def main() -> None:

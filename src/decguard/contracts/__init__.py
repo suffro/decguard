@@ -17,6 +17,8 @@ from decguard.contracts.models import (
     NoulDecision,
     ScoreDecision,
 )
+from decguard.contracts.policy import Policy, PolicyAction, PolicyCondition, PolicyRoute
+from decguard.contracts.production import Production, ProductionGates, SegmentGates
 
 __all__ = [
     "DEFAULT_BACKEND",
@@ -28,7 +30,14 @@ __all__ = [
     "Gates",
     "LoadedContract",
     "NoulDecision",
+    "Policy",
+    "PolicyAction",
+    "PolicyCondition",
+    "PolicyRoute",
+    "Production",
+    "ProductionGates",
     "ScoreDecision",
+    "SegmentGates",
     "contract_hash",
     "load_contract",
     "parse_contract",

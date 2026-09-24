@@ -65,6 +65,8 @@ jobs:
           set -e
           test "$fuzz_code" -eq 1 && test "$replay_code" -eq 1
           /tmp/clean/bin/decguard diff report.json report.json --contract examples/refund/decguard.yaml
+          /tmp/clean/bin/decguard check examples/refund/decguard.yaml --dataset examples/refund/production.jsonl --output production-report.json
+          /tmp/clean/bin/decguard run examples/refund/decguard.yaml "The blender arrived damaged"
       - uses: actions/upload-artifact@v4
         with:
           name: dist

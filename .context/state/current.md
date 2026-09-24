@@ -2,10 +2,9 @@
 
 ## Current focus
 
-Building DecGuard v0.1 following `DECGUARD_V0.1_CODEX_PLAN.md` (this directory). Step 1
-is merged (PR #1). Step 2 (metamorphic fuzzing, regression diff, replay, CI) is
-implemented on branch `step-2-fuzzing`. Step 3 (post-deployment checks, cascade policies,
-SDK) is next.
+Building DecGuard v0.1 following `DECGUARD_V0.1_CODEX_PLAN.md` (this directory). Steps 1
+and 2 are merged. Step 3 (offline post-deployment checks, explicit cascade policies and
+SDK) is implemented on branch `step-3-production-policy` and awaiting review/merge.
 
 ## Recent relevant changes
 
@@ -18,12 +17,14 @@ SDK) is next.
   seeding; greedy minimization; paraphrase providers; CLI `fuzz`, `test --all`, `replay`,
   `diff`; report `mode` + `properties` section with load-time integrity checks; mock
   `position_bias`; examples with properties; CI demonstrates a failing property.
+- Step 3: backend-neutral production records; offline `check` reports with calibration,
+  threshold/routing/confidence/latency/cost metrics; baseline drift; metadata segments and
+  gates; deterministic `policy` routes; CLI `run`; minimal `DecGuard` Python SDK; CI smoke.
 
 ## Next
 
-- Step 3 per the plan: offline analysis of production JSONL, calibration drift gates,
-  segmentation, explicit policy engine (accept/abstain/fallback/review), Python SDK.
-- The contract schema still rejects `policy`; add it (schema `0.1` while unreleased).
+- Complete review and merge of Step 3. Do not tag/publish v0.1 without the separate final
+  release validation in the plan.
 
 ## Blockers
 
