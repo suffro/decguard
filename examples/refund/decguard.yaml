@@ -1,0 +1,44 @@
+# A three-way choice decision checked against a deterministic mock backend.
+schema_version: "0.1"
+
+decision:
+  name: refund_request
+  description: Decide how to handle a customer refund request.
+  type: choice
+  options: [refund, reject, review]
+
+backend:
+  provider: mock
+  model: refund-mock-v1
+  rules:
+    - contains: "damaged"
+      probabilities: {refund: 0.96, reject: 0.01, review: 0.03}
+    - contains: "never arrived"
+      probabilities: {refund: 0.90, reject: 0.02, review: 0.08}
+    - contains: "changed my mind"
+      probabilities: {refund: 0.05, reject: 0.85, review: 0.10}
+    - contains: "used it for"
+      probabilities: {refund: 0.03, reject: 0.93, review: 0.04}
+  default: {refund: 0.20, reject: 0.15, review: 0.65}
+
+# Swap in a real endpoint with `decguard test examples/refund/decguard.yaml -b staging`.
+backends:
+  staging:
+    provider: http
+    url: http://localhost:8080/decide
+    model: open-jev-2b
+    timeout_s: 10
+    bearer_token_env: DECGUARD_STAGING_TOKEN
+
+dataset: cases.jsonl
+
+evaluation:
+  confidence_threshold: 0.8
+
+requirements:
+  min_accuracy: 0.9
+  max_ece: 0.15
+  min_coverage: 0.5
+
+warnings:
+  max_latency_p95_ms: 500

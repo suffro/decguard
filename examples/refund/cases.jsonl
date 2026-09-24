@@ -1,0 +1,11 @@
+{"id": "r1", "input": "The blender arrived damaged and won't turn on.", "expected": "refund", "metadata": {"locale": "en"}}
+{"id": "r2", "input": "My parcel never arrived, tracking stopped two weeks ago.", "expected": "refund", "metadata": {"locale": "en"}}
+{"id": "r3", "input": "I changed my mind about the colour, please take it back.", "expected": "reject", "metadata": {"locale": "en"}}
+{"id": "r4", "input": "I used it for three months and now want my money back.", "expected": "reject", "metadata": {"locale": "en"}}
+{"id": "r5", "input": "The invoice shows a different price than the website did.", "expected": "review", "metadata": {"locale": "en"}}
+{"id": "r6", "input": "Screen was damaged in transit, photos attached.", "expected": "refund", "metadata": {"locale": "en"}}
+{"id": "r7", "input": "Package never arrived but the courier says delivered.", "expected": "refund", "metadata": {"locale": "en"}}
+{"id": "r8", "input": "Charged twice for the same order.", "expected": "review", "metadata": {"locale": "en"}}
+{"id": "r9", "input": "I changed my mind, found it cheaper elsewhere.", "expected": "reject", "metadata": {"locale": "en"}}
+{"id": "r10", "input": "Box was damaged and one part is missing.", "expected": "refund", "metadata": {"locale": "en"}}
+{"id": "r11", "input": "Can someone call me about my order?", "metadata": {"locale": "en"}}

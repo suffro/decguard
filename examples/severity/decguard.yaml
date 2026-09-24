@@ -1,0 +1,25 @@
+# An ordered score decision. Levels go from lowest to highest.
+schema_version: "0.1"
+
+decision:
+  name: incident_severity
+  type: score
+  levels: [1, 2, 3, 4]
+
+backend:
+  provider: mock
+  model: severity-mock-v1
+  rules:
+    - contains: "outage"
+      probabilities: {"1": 0.01, "2": 0.04, "3": 0.15, "4": 0.80}
+    - contains: "degraded"
+      probabilities: {"1": 0.05, "2": 0.15, "3": 0.70, "4": 0.10}
+    - contains: "typo"
+      probabilities: {"1": 0.85, "2": 0.10, "3": 0.04, "4": 0.01}
+  default: {"1": 0.10, "2": 0.60, "3": 0.25, "4": 0.05}
+
+dataset: cases.jsonl
+
+requirements:
+  min_accuracy: 0.8
+  max_ordinal_mae: 0.3
