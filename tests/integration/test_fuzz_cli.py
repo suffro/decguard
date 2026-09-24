@@ -202,6 +202,60 @@ def test_transformed_backend_error_replay_semantics(
     assert "PASS: no failure reproduced" in out
 
 
+def test_default_replay_skips_synthetic_original_errors(
+    make_contract: ContractFactory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = make_contract(
+        {"properties": {"whitespace": {"max_tv_distance": 0}}},
+        cases=[
+            {"id": "c1", "input": "damaged", "expected": "refund"},
+            {"id": "c2", "input": "changed", "expected": "reject"},
+        ],
+    )
+
+    def original_error_backend(request: DecisionRequest) -> dict[str, float]:
+        if request.case_id == "c1":
+            raise InvalidResponse("original request failed")
+        probabilities = {"refund": 0.8, "reject": 0.1, "review": 0.1}
+        return {label: probabilities[label] for label in request.decision.labels}
+
+    report = run_test(
+        contract,
+        backend=CallableBackend(original_error_backend, name="default"),
+        mode="fuzz",
+    )
+    assert report.status is Status.FAIL
+    assert report.properties is not None
+    original_errors = [pair for pair in report.properties.pairs if pair.error is not None]
+    assert original_errors
+    assert {pair.error.kind for pair in original_errors if pair.error} == {"original_error"}
+    (summary,) = report.properties.summaries
+    assert summary.n_errors == len(original_errors)
+    assert summary.errors_by_kind == {"original_error": len(original_errors)}
+    assert {check.gate: check.status for check in report.checks}[
+        "whitespace.max_error_rate"
+    ] is Status.FAIL
+    assert report.properties.failures() == []
+
+    stored = tmp_path / "original-error-fuzz.json"
+    write_report(report, stored)
+    replayed_requests: list[str] = []
+
+    def replay_backend(request: DecisionRequest) -> dict[str, float]:
+        replayed_requests.append(request.case_id)
+        return original_error_backend(request)
+
+    monkeypatch.setattr(
+        replay_module,
+        "create_backend",
+        lambda config, *, decision, name: CallableBackend(replay_backend, name=name),
+    )
+    code, out, err = invoke("replay", stored, "--format", "json")
+    assert code == 0, out + err
+    assert json.loads(out)["outcomes"] == []
+    assert replayed_requests == []
+
+
 def test_report_shows_and_reevaluates_fuzz_reports(refund: Path, tmp_path: Path) -> None:
     stored = tmp_path / "fuzz.json"
     invoke("fuzz", refund, "-b", "order_sensitive", "-o", stored)
