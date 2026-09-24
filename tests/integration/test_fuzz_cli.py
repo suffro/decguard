@@ -12,10 +12,22 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from decguard.backends import MockBackend, MockSettings
+import decguard.fuzz.replay as replay_module
+from decguard.backends import CallableBackend, MockBackend, MockSettings
 from decguard.cli import app
+from decguard.decisions import DecisionRequest
 from decguard.engine import run_test
-from tests.conftest import CHOICE_CASES, CHOICE_CONTRACT, EXAMPLES, write_jsonl, write_yaml
+from decguard.errors import BackendUnavailable, InvalidResponse
+from decguard.reports import write_report
+from decguard.reports.gates import Status
+from tests.conftest import (
+    CHOICE_CASES,
+    CHOICE_CONTRACT,
+    EXAMPLES,
+    ContractFactory,
+    write_jsonl,
+    write_yaml,
+)
 from tests.integration.conftest import start_server
 
 runner = CliRunner()
@@ -123,6 +135,71 @@ def test_stored_failures_replay(refund: Path, tmp_path: Path) -> None:
     code, _, err = invoke("replay", golden)
     assert code == 2
     assert "no property results" in err
+
+
+def test_transformed_backend_error_replay_semantics(
+    make_contract: ContractFactory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = make_contract(
+        {"properties": {"whitespace": {"max_tv_distance": 0}}},
+        cases=[{"id": "c1", "input": "damaged", "expected": "refund"}],
+    )
+
+    def backend(
+        error: type[Exception] | None, message: str = "transformed request failed"
+    ) -> CallableBackend:
+        def decide(request: DecisionRequest) -> dict[str, float]:
+            if "/" in request.case_id and error is not None:
+                raise error(message)
+            probabilities = {"refund": 0.8, "reject": 0.1, "review": 0.1}
+            return {label: probabilities[label] for label in request.decision.labels}
+
+        return CallableBackend(decide, name="default")
+
+    report = run_test(contract, backend=backend(InvalidResponse), mode="fuzz")
+    assert report.status is Status.FAIL
+    assert report.exit_code == 1
+    assert report.properties is not None
+    failures = report.properties.failures()
+    assert failures
+    assert all(failure.error is not None for failure in failures)
+    assert {failure.error.kind for failure in failures if failure.error} == {"invalid_response"}
+    stored = tmp_path / "errored-fuzz.json"
+    write_report(report, stored)
+
+    monkeypatch.setattr(
+        replay_module,
+        "create_backend",
+        lambda config, *, decision, name: backend(InvalidResponse, "still invalid"),
+    )
+    code, out, err = invoke("replay", stored, "--format", "json")
+    assert code == 1, out + err
+    replayed = json.loads(out)
+    assert len(replayed["outcomes"]) == len(failures)  # selected without --id
+    examples = [outcome["examples"][0] for outcome in replayed["outcomes"]]
+    assert all(example["stored_error"]["kind"] == "invalid_response" for example in examples)
+    assert all(example["error"]["kind"] == "invalid_response" for example in examples)
+    assert all(example["reproduced"] is True for example in examples)
+
+    monkeypatch.setattr(
+        replay_module,
+        "create_backend",
+        lambda config, *, decision, name: backend(None),
+    )
+    code, out, err = invoke("replay", stored, "--format", "json")
+    assert code == 0, out + err
+    replayed = json.loads(out)
+    assert all(outcome["examples"][0]["reproduced"] is False for outcome in replayed["outcomes"])
+
+    monkeypatch.setattr(
+        replay_module,
+        "create_backend",
+        lambda config, *, decision, name: backend(BackendUnavailable, "temporarily offline"),
+    )
+    code, out, err = invoke("replay", stored)
+    assert code == 0, out + err
+    assert "error changed: invalid_response -> unavailable" in out
+    assert "PASS: no failure reproduced" in out
 
 
 def test_report_shows_and_reevaluates_fuzz_reports(refund: Path, tmp_path: Path) -> None:

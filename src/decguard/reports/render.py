@@ -153,7 +153,10 @@ def _property_failure_lines(run: PropertyRun) -> list[str]:
     ]
     for pair in shown:
         lines.append(f"    {pair.id}")
-        lines.append(f"      {'; '.join(pair.violations)}")
+        if pair.error is not None:
+            lines.append(f"      error: {pair.error.kind}: {pair.error.message}")
+        else:
+            lines.append(f"      {'; '.join(pair.violations)}")
         lines.append(f"      sent: {describe_example(pair.presentation, pair.input)}")
         if pair.reduced is not None:
             lines.append(

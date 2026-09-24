@@ -79,7 +79,7 @@ class PropertyPair(_Section):
         return self
 
     def failed(self) -> bool:
-        return bool(self.violations)
+        return self.error is not None or bool(self.violations)
 
 
 class Skip(_Section):

@@ -61,6 +61,8 @@ versioned separately.
 
 ### Changed
 
+- Replay treats transformed-case backend errors as Step-2 failures and reproduces them
+  only when the backend returns the same stable error kind.
 - Mock rules match ignoring whitespace differences as well as case.
 - Examples declare properties; `severity` uses object inputs (`text`, `affected_users`).
   The refund example's `max_ece` is 0.2.

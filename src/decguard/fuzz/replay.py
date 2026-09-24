@@ -43,6 +43,7 @@ class ReplayedExample(_Section):
     input: DecisionInput
     presentation: tuple[tuple[str, str], ...] | None = None
     stored_violations: tuple[str, ...]
+    stored_error: CaseError | None = None
     result: DecisionResult | None = None
     error: CaseError | None = None
     comparison: Comparison | None = None
@@ -174,6 +175,7 @@ def replay(
                     "transformed",
                     Mutation(pair.steps, pair.input, pair.presentation),
                     pair.violations,
+                    pair.error,
                 )
             ]
             if pair.reduced is not None:
@@ -183,23 +185,33 @@ def replay(
                         "reduced",
                         Mutation(reduced.steps, reduced.input, reduced.presentation),
                         reduced.violations,
+                        None,
                     )
                 )
             replayed = []
-            for kind, mutation, stored_violations in examples:
+            for kind, mutation, stored_violations, stored_error in examples:
                 outcome = decide_mutation(instance, spec, pair.id, mutation, tolerance)
                 fields: dict[str, object] = {
                     "kind": kind,
                     "input": mutation.input,
                     "presentation": mutation.presentation,
                     "stored_violations": stored_violations,
+                    "stored_error": stored_error,
                 }
                 if isinstance(outcome, CaseError):
-                    replayed.append(ReplayedExample(**fields, error=outcome, reproduced=False))
+                    replayed.append(
+                        ReplayedExample(
+                            **fields,
+                            error=outcome,
+                            reproduced=(
+                                stored_error is not None and outcome.kind == stored_error.kind
+                            ),
+                        )
+                    )
                     continue
                 comparison = None
                 violations: tuple[str, ...] = ()
-                if isinstance(original, DecisionResult):
+                if stored_error is None and isinstance(original, DecisionResult):
                     comparison = comparison_for(prop, original, outcome)
                     violations = tuple(judge(prop, comparison).violations)
                 replayed.append(
@@ -264,7 +276,18 @@ def render_replay_text(report: ReplayReport) -> str:
                 f"    {example.kind}: {describe_example(example.presentation, example.input)}"
             )
             if example.error is not None:
-                lines.append(f"      error: {example.error.kind}: {example.error.message}")
+                if (
+                    example.stored_error is not None
+                    and example.error.kind != example.stored_error.kind
+                ):
+                    lines.append(
+                        f"      error changed: {example.stored_error.kind} -> "
+                        f"{example.error.kind}: {example.error.message}"
+                    )
+                else:
+                    lines.append(f"      error: {example.error.kind}: {example.error.message}")
+            elif example.stored_error is not None:
+                lines.append(f"      holds now (stored error: {example.stored_error.kind})")
             elif example.violations:
                 lines.append(f"      {'; '.join(example.violations)}")
             else:

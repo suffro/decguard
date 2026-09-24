@@ -198,7 +198,7 @@ class PropertyRunner:
             failing = [
                 index
                 for index, (item, pair) in enumerate(zip(planned, pairs, strict=True))
-                if pair.failed() and item.config.reducible
+                if pair.violations and item.config.reducible
             ]
 
             def reduce(index: int) -> ReducedExample | None:
