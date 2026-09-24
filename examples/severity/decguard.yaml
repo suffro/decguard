@@ -1,4 +1,5 @@
-# An ordered score decision. Levels go from lowest to highest.
+# An ordered score decision. Levels go from lowest to highest. Inputs are objects: the
+# text transformations edit the `text` field, and `monotonic` raises `affected_users`.
 schema_version: "0.1"
 
 decision:
@@ -14,6 +15,8 @@ backend:
       probabilities: {"1": 0.01, "2": 0.04, "3": 0.15, "4": 0.80}
     - contains: "degraded"
       probabilities: {"1": 0.05, "2": 0.15, "3": 0.70, "4": 0.10}
+    - contains: "delayed"
+      probabilities: {"1": 0.05, "2": 0.25, "3": 0.60, "4": 0.10}
     - contains: "typo"
       probabilities: {"1": 0.85, "2": 0.10, "3": 0.04, "4": 0.01}
   default: {"1": 0.10, "2": 0.60, "3": 0.25, "4": 0.05}
@@ -23,3 +26,18 @@ dataset: cases.jsonl
 requirements:
   min_accuracy: 0.8
   max_ordinal_mae: 0.3
+
+fuzz:
+  seed: 7
+  text_field: text
+
+properties:
+  irrelevant_context:
+    max_tv_distance: 0.05
+  whitespace:
+    max_tv_distance: 0.02
+  monotonic:
+    field: affected_users
+    direction: increasing
+    deltas: [100, 10000]
+    max_level_decrease: 0.05

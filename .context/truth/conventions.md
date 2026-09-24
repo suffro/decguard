@@ -12,7 +12,9 @@
   changing their meaning requires a version bump and a CHANGELOG entry.
 - Tests: `tests/unit/` (pure, fast) and `tests/integration/` (CLI, local HTTP server);
   shared fixtures in `tests/conftest.py`. Examples in `examples/` must pass `decguard
-  test` (enforced by `test_examples_pass`).
+  test` and `decguard test --all` (`test_examples_pass`, `test_examples_pass_all_checks`).
+- Deterministic outputs that users may store (mock hash distribution, fuzz RNG stream)
+  are pinned by tests; changing them is a CHANGELOG-worthy format change.
 - Docs for users in `docs/`; user-visible changes go in `CHANGELOG.md` under Unreleased.
 
 ## Development workflow

@@ -21,6 +21,10 @@ from decguard.backends.registry import create_backend
 from decguard.contracts.loader import load_contract
 from decguard.engine import resolve_dataset, run_test
 from decguard.errors import DecGuardError
+from decguard.fuzz.paraphrase import create_paraphraser
+from decguard.fuzz.replay import render_replay_text
+from decguard.fuzz.replay import replay as replay_failures
+from decguard.regression.diff import load_and_diff, render_diff_text, write_diff
 from decguard.reports.gates import Status
 from decguard.reports.model import Report, load_report, reevaluate, write_report
 from decguard.reports.render import render_text
@@ -33,6 +37,8 @@ app = typer.Typer(
     name="decguard",
     help=(
         "Test, verify and gate probabilistic AI decision models.\n\n"
+        "validate a contract, test it on a golden dataset, fuzz its metamorphic properties, "
+        "diff two runs for regressions, replay stored failures.\n\n"
         "Exit codes: 0 = pass (or warn), 1 = reliability gate failed, "
         "2 = configuration/runtime error."
     ),
@@ -127,6 +133,9 @@ def validate(contract: ContractArg, dataset: DatasetOpt = None) -> None:
         spec = c.spec()
         for name in c.backend_names():
             create_backend(c.backend_config(name), decision=spec, name=name).close()
+        paraphrase = c.properties.paraphrase
+        if paraphrase is not None and paraphrase.enabled:
+            create_paraphraser(paraphrase.source, base_dir=loaded.path.parent).close()
         lines = [
             f"OK  {contract}",
             f"    decision  {spec.name} ({spec.type}): {', '.join(spec.labels)}",
@@ -143,37 +152,67 @@ def validate(contract: ContractArg, dataset: DatasetOpt = None) -> None:
         lines += [
             f"    gates     requirements: {len(c.requirements.configured())}, "
             f"warnings: {len(c.warnings.configured())}",
+            "    properties "
+            + (", ".join(c.properties.configured()) or "none (add 'properties' to fuzz)"),
             f"    hash      {loaded.hash}",
         ]
         typer.echo("\n".join(lines))
+
+
+BackendOpt = Annotated[
+    str | None,
+    typer.Option("--backend", "-b", help="Named backend from the contract's 'backends' section."),
+]
+MaxConcurrencyOpt = Annotated[
+    int | None,
+    typer.Option(
+        "--max-concurrency",
+        min=1,
+        max=256,
+        help="Parallel backend calls (default: evaluation.max_concurrency).",
+    ),
+]
+HealthcheckOpt = Annotated[
+    bool,
+    typer.Option("--healthcheck/--no-healthcheck", help="Check backend health before running."),
+]
+SeedOpt = Annotated[
+    int | None,
+    typer.Option("--seed", min=0, help="Transformation seed (default: fuzz.seed, else 0)."),
+]
+PropertyOpt = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--property", "-p", help="Run only this property (repeatable). Default: all enabled."
+    ),
+]
+MinimizeOpt = Annotated[
+    bool | None,
+    typer.Option(
+        "--minimize/--no-minimize",
+        help="Shrink failing transformations (default: fuzz.minimize).",
+        show_default=False,
+    ),
+]
 
 
 @app.command("test")
 def cmd_test(
     contract: ContractArg,
     dataset: DatasetOpt = None,
-    backend: Annotated[
-        str | None,
-        typer.Option(
-            "--backend", "-b", help="Named backend from the contract's 'backends' section."
-        ),
-    ] = None,
+    backend: BackendOpt = None,
     output: OutputOpt = None,
     fmt: FormatOpt = OutputFormat.TEXT,
-    max_concurrency: Annotated[
-        int | None,
-        typer.Option(
-            "--max-concurrency",
-            min=1,
-            max=256,
-            help="Parallel backend calls (default: evaluation.max_concurrency).",
-        ),
-    ] = None,
+    max_concurrency: MaxConcurrencyOpt = None,
     fail_on_warn: FailOnWarnOpt = False,
-    healthcheck: Annotated[
+    healthcheck: HealthcheckOpt = True,
+    all_checks: Annotated[
         bool,
-        typer.Option("--healthcheck/--no-healthcheck", help="Check backend health before running."),
-    ] = True,
+        typer.Option("--all", help="Also check the contract's metamorphic properties (fuzz)."),
+    ] = False,
+    seed: SeedOpt = None,
+    properties: PropertyOpt = None,
+    minimize: MinimizeOpt = None,
 ) -> None:
     """Run the golden dataset through a backend and check the contract's gates."""
     with _handle_errors():
@@ -183,6 +222,42 @@ def cmd_test(
             backend=backend,
             max_concurrency=max_concurrency,
             check_health=healthcheck,
+            mode="all" if all_checks else "test",
+            seed=seed,
+            properties=properties,
+            minimize=minimize,
+        )
+        _emit(report, fmt, output, fail_on_warn)
+
+
+@app.command()
+def fuzz(
+    contract: ContractArg,
+    dataset: DatasetOpt = None,
+    backend: BackendOpt = None,
+    seed: SeedOpt = None,
+    properties: PropertyOpt = None,
+    minimize: MinimizeOpt = None,
+    output: OutputOpt = None,
+    fmt: FormatOpt = OutputFormat.TEXT,
+    max_concurrency: MaxConcurrencyOpt = None,
+    fail_on_warn: FailOnWarnOpt = False,
+    healthcheck: HealthcheckOpt = True,
+) -> None:
+    """Check the contract's metamorphic properties: transform each case in controlled
+    ways (option order, formatting, irrelevant context, paraphrase, ...) and compare the
+    decision distributions before and after. Deterministic for a given seed."""
+    with _handle_errors():
+        report = run_test(
+            contract,
+            dataset=dataset,
+            backend=backend,
+            max_concurrency=max_concurrency,
+            check_health=healthcheck,
+            mode="fuzz",
+            seed=seed,
+            properties=properties,
+            minimize=minimize,
         )
         _emit(report, fmt, output, fail_on_warn)
 
@@ -210,6 +285,76 @@ def report(
         if contract is not None:
             stored = reevaluate(stored, load_contract(contract))
         _emit(stored, fmt, output, fail_on_warn)
+
+
+@app.command()
+def diff(
+    baseline: Annotated[
+        Path, typer.Argument(help="Baseline JSON report (e.g. the current model).")
+    ],
+    candidate: Annotated[Path, typer.Argument(help="Candidate JSON report (e.g. a new model).")],
+    contract: Annotated[
+        Path | None,
+        typer.Option(
+            "--contract", "-c", help="Apply this contract's 'regression' gates and evaluation."
+        ),
+    ] = None,
+    segment_by: Annotated[
+        list[str] | None,
+        typer.Option("--segment-by", "-s", help="Case metadata key to segment by (repeatable)."),
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Also write the JSON diff to this file.")
+    ] = None,
+    fmt: FormatOpt = OutputFormat.TEXT,
+    fail_on_warn: FailOnWarnOpt = False,
+) -> None:
+    """Compare two reports of the same decision: answer flips, confidence and distribution
+    shifts, calibration/accuracy/latency changes, new errors, per-segment changes. Exits 1
+    when a regression gate is violated (new errors always count)."""
+    with _handle_errors():
+        result = load_and_diff(baseline, candidate, contract=contract, segment_by=segment_by)
+        if output is not None:
+            write_diff(result, output)
+            typer.echo(f"diff written to {output}", err=True)
+        if fmt is OutputFormat.JSON:
+            typer.echo(result.model_dump_json(indent=2))
+        else:
+            typer.echo(render_diff_text(result))
+        if result.status is Status.FAIL or (fail_on_warn and result.status is Status.WARN):
+            raise typer.Exit(EXIT_GATE_FAILED)
+
+
+@app.command()
+def replay(
+    results: Annotated[
+        Path, typer.Argument(help="JSON report written by `decguard fuzz --output`.")
+    ],
+    ids: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--id",
+            help="Transformed case to replay, as '<property>/<case id>/<sample>' "
+            "(repeatable). Default: every failure in the report.",
+        ),
+    ] = None,
+    contract: Annotated[
+        Path | None,
+        typer.Option("--contract", "-c", help="Contract to use (default: the report's)."),
+    ] = None,
+    backend: BackendOpt = None,
+    fmt: FormatOpt = OutputFormat.TEXT,
+) -> None:
+    """Re-send stored property failures to the backend and check whether they still fail.
+    Exits 1 when a failure reproduces, 0 when none does."""
+    with _handle_errors():
+        result = replay_failures(results, ids=ids, contract=contract, backend=backend)
+        if fmt is OutputFormat.JSON:
+            typer.echo(result.model_dump_json(indent=2))
+        else:
+            typer.echo(render_replay_text(result))
+        if result.status is Status.FAIL:
+            raise typer.Exit(EXIT_GATE_FAILED)
 
 
 def main() -> None:

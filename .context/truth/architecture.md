@@ -7,13 +7,15 @@ decision models against a versioned Decision Contract and produces one canonical
 reliability report with PASS / WARN / FAIL gates. It is backend-neutral: models are
 reached through thin adapters that all normalize into the same `DecisionResult`.
 
-The v0.1 plan is `state/DECGUARD_V0.1_CODEX_PLAN.md`. Step 1 (core, contracts, backends,
-CLI) is implemented; fuzzing, regression, post-deploy checks and policies are not yet.
+The v0.1 plan is `state/DECGUARD_V0.1_CODEX_PLAN.md`. Steps 1 (core, contracts, backends,
+CLI) and 2 (metamorphic fuzzing, regression diff, replay) are implemented; post-deploy
+checks and policies are not yet.
 
 ## Major components
 
 - `contracts/`: schema `0.1` (`models.py`: `Contract`, `ChoiceDecision` / `NoulDecision` /
-  `ScoreDecision`, `BackendConfig`, `Evaluation`, `Gates`) and loading (`loader.py`: safe
+  `ScoreDecision`, `BackendConfig`, `Evaluation`, `Gates`; `properties.py`: `Properties`
+  and one model per property, `Fuzz`, `Regression`) and loading (`loader.py`: safe
   YAML/JSON with duplicate-key rejection, `sha256:` hash of the normalized contract).
 - `decisions/`: `DecisionSpec` (name, type, canonical label order), `DecisionRequest`,
   `Prediction` (raw backend output), `DecisionResult` (unified schema) and
@@ -26,12 +28,20 @@ CLI) is implemented; fuzzing, regression, post-deploy checks and policies are no
 - `runner.py`: runs cases with a bounded thread pool, keeps dataset order, turns
   `BackendError`s and unexpected plugin exceptions into per-case `CaseError`s; other
   `DecGuardError`s abort.
-- `metrics/`: `core.py` pure stdlib metric functions; `summary.py` aggregates records into
-  `Metrics` (counts, classification, calibration, selective, latency).
-- `reports/`: `gates.py` (gate table, implicit `max_error_rate: 0`, status), `model.py`
-  (`Report` JSON model, `build_report`, `reevaluate`, read/write), `render.py` (terminal).
-- `engine.py`: `run_test()` orchestration shared by CLI and Python API.
-- `cli/`: typer app with `validate`, `test`, `report`.
+- `metrics/`: `core.py` pure stdlib metric functions; `distribution.py` TV / JS / max
+  delta / expected level / ranking; `summary.py` aggregates records into `Metrics`.
+- `fuzz/`: `rng.py` (SHA-256 stream per seed/property/case), `transforms.py` (pure,
+  replayable step lists; option presentation as `(shown, label)` pairs), `paraphrase.py`
+  (`identity`, `file`, `openai`, `decguard.paraphrasers` plugins), `compare.py`
+  (`Comparison`, `judge`), `engine.py` (`PropertyRunner`: plan, execute, map shown labels
+  back, compare, minimize), `replay.py` (re-send stored failures, regeneration check).
+- `regression/diff.py`: `diff_reports` on matched case ids, `DiffReport`, regression gates.
+- `reports/`: `gates.py` (gate table, `make_check`, implicit `max_error_rate: 0`, status),
+  `model.py` (`Report` JSON model with `mode` and optional `properties`, `build_report`,
+  `reevaluate`, read/write), `properties.py` (transformed-case records, summaries, property
+  checks, `rejudge`, load-time `verify_run`), `render.py` (terminal).
+- `engine.py`: `run_test(mode="test"|"fuzz"|"all")` orchestration shared by CLI and API.
+- `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`.
 
 ## Data flow
 
@@ -39,6 +49,10 @@ contract file → `load_contract` → `Contract` → `spec()` + `create_backend(
 dataset file → `load_dataset` → cases; `run_cases` → `CaseRecord`s (result or error) →
 `compute_metrics` → `evaluate_gates` → `Report` → JSON file / terminal text / exit code.
 `decguard report --contract` re-runs the last three steps on stored records.
+Fuzz: after the golden run, each enabled property generates transformations per case →
+`decide_mutation` (shown labels → backend → mapped back) → `compare`/`judge` against the
+original → minimize failures → `PropertyRun` in the same `Report`.
+Diff: two stored reports → matched cases → shifts, metric deltas, segments → gates.
 
 ## External systems
 
@@ -56,5 +70,7 @@ dataset file → `load_dataset` → cases; `run_cases` → `CaseRecord`s (result
   pinned by a test.
 - Credentials only via environment variables; never in reports, errors or metadata.
 - Contracts never execute code (safe YAML, no import paths).
+- Fuzz runs are reproducible from the stored seed; transformation generation is pinned by
+  tests (see `decisions/metamorphic-engine-design.md`).
 - Runtime dependencies: pydantic, typer, httpx, PyYAML (see
   `decisions/core-dependencies-and-internal-metrics.md`).

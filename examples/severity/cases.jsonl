@@ -1,10 +1,10 @@
-{"input": "Full outage of the payments API in all regions", "expected": 4}
-{"input": "Checkout latency degraded by 40% in eu-west", "expected": 3}
-{"input": "Typo on the pricing page", "expected": 1}
-{"input": "Single customer cannot reset password", "expected": 2}
-{"input": "Login outage for SSO users", "expected": 4}
-{"input": "Search results degraded for some queries", "expected": 3}
-{"input": "Dashboard chart colours look off", "expected": 2}
-{"input": "Typo in the error message", "expected": 1}
-{"input": "Webhook deliveries delayed by a few minutes", "expected": 3}
-{"input": "Export to CSV fails for large accounts", "expected": 2}
+{"id": "s1", "input": {"text": "Full outage of the payments API in all regions.", "affected_users": 120000}, "expected": 4, "metadata": {"team": "payments"}}
+{"id": "s2", "input": {"text": "Checkout latency degraded by 40% in eu-west.", "affected_users": 8000}, "expected": 3, "metadata": {"team": "payments"}}
+{"id": "s3", "input": {"text": "Typo on the pricing page.", "affected_users": 0}, "expected": 1, "metadata": {"team": "web"}}
+{"id": "s4", "input": {"text": "Single customer cannot reset password.", "affected_users": 1}, "expected": 2, "metadata": {"team": "identity"}}
+{"id": "s5", "input": {"text": "Login outage for SSO users.", "affected_users": 30000}, "expected": 4, "metadata": {"team": "identity"}}
+{"id": "s6", "input": {"text": "Search results degraded for some queries.", "affected_users": 2500}, "expected": 3, "metadata": {"team": "web"}}
+{"id": "s7", "input": {"text": "Dashboard chart colours look off.", "affected_users": 40}, "expected": 2, "metadata": {"team": "web"}}
+{"id": "s8", "input": {"text": "Typo in the error message.", "affected_users": 0}, "expected": 1, "metadata": {"team": "identity"}}
+{"id": "s9", "input": {"text": "Webhook deliveries delayed by a few minutes.", "affected_users": 600}, "expected": 3, "metadata": {"team": "payments"}}
+{"id": "s10", "input": {"text": "Export to CSV fails for large accounts.", "affected_users": 12}, "expected": 2, "metadata": {"team": "web"}}

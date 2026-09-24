@@ -13,6 +13,9 @@ dataset: cases.jsonl       # optional, relative to the contract file
 evaluation: {...}          # optional
 requirements: {...}        # optional hard gates
 warnings: {...}            # optional soft gates
+properties: {...}          # optional metamorphic properties (decguard fuzz / test --all)
+fuzz: {...}                # optional fuzz settings: seed, text_field, minimization
+regression: {...}          # optional regression gates (decguard diff)
 ```
 
 ## `decision`
@@ -96,3 +99,14 @@ fails.
 Reports record `sha256:` of the normalized contract (canonical JSON of the parsed model),
 so reformatting or reordering keys does not change it but any semantic change does.
 Contracts contain environment-variable names, never secret values.
+
+## `properties` and `fuzz`
+
+Metamorphic properties (option order, label format, irrelevant context, whitespace,
+paraphrase, noul inversion, score monotonicity) and their tolerances. See
+[properties.md](properties.md).
+
+## `regression`
+
+Limits on how much a candidate run may degrade relative to a baseline, applied by
+`decguard diff`. See [regression.md](regression.md).

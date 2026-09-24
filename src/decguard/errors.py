@@ -48,3 +48,9 @@ class InvalidResponse(BackendError):
     """The backend answered, but the answer is not a valid probability distribution."""
 
     kind: ClassVar[str] = "invalid_response"
+
+
+class ParaphraseError(BackendError):
+    """A paraphrase provider failed for one case; recorded like a backend error."""
+
+    kind: ClassVar[str] = "paraphrase_error"
