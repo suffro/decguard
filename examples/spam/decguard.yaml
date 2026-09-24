@@ -1,0 +1,24 @@
+# A boolean ("noul") decision. Labels default to [yes, no]; the positive label comes first.
+schema_version: "0.1"
+
+decision:
+  name: is_spam
+  type: noul
+  labels: [spam, ham]
+
+backend:
+  provider: mock
+  model: spam-mock-v1
+  rules:
+    - contains: "winner"
+      probabilities: {spam: 0.97, ham: 0.03}
+    - contains: "free money"
+      probabilities: {spam: 0.92, ham: 0.08}
+  default: {spam: 0.06, ham: 0.94}
+
+dataset: cases.json
+
+requirements:
+  min_accuracy: 0.9
+  min_macro_f1: 0.85
+  max_brier: 0.25

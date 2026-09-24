@@ -1,0 +1,88 @@
+[project]
+name = "decguard"
+version = "0.1.0.dev0"
+description = "Test, verify and gate probabilistic AI decision models across interchangeable backends."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "DecGuard contributors" }]
+keywords = ["ai", "reliability", "calibration", "testing", "ci", "decision-models"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.27,<1",
+    "pydantic>=2.7,<3",
+    "pyyaml>=6.0.1,<7",
+    "typer>=0.12,<1",
+]
+
+[project.urls]
+Repository = "https://github.com/suffro/decguard"
+Changelog = "https://github.com/suffro/decguard/blob/main/CHANGELOG.md"
+
+[project.scripts]
+decguard = "decguard.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10",
+    "pytest>=8",
+    "ruff>=0.6",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/decguard"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/decguard", "tests", "docs", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "external: needs a real decision backend (opt-in, set DECGUARD_EXTERNAL_CONTRACT)",
+]
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "PT", "C4", "RET", "PL"]
+# RUF012: pydantic copies mutable field defaults per instance.
+ignore = ["PLR0913", "PLR2004", "PLR0911", "PLR0912", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR0915", "PLC0415"]
+"src/decguard/cli/**" = ["PLR0917"]  # typer maps options to parameters
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false

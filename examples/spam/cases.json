@@ -1,0 +1,12 @@
+[
+  {"input": "You are a WINNER! Claim your prize now.", "expected": "spam"},
+  {"input": "Free money for everyone who clicks this link", "expected": "spam"},
+  {"input": "Lunch at 1pm tomorrow?", "expected": "ham"},
+  {"input": "Here are the meeting notes from Tuesday.", "expected": "ham"},
+  {"input": "Winner of the office raffle is Ana, congrats!", "expected": "ham"},
+  {"input": "Your invoice for September is attached.", "expected": "ham"},
+  {"input": "Can you review my pull request?", "expected": "ham"},
+  {"input": "Congratulations winner, send your bank details", "expected": "spam"},
+  {"input": "Reminder: dentist appointment on Friday", "expected": "ham"},
+  {"input": "Team offsite agenda", "expected": "ham"}
+]
