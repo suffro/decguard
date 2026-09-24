@@ -58,7 +58,7 @@ evaluation:
 
 requirements:
   min_accuracy: 0.9
-  max_ece: 0.2
+  max_ece: 0.15
   min_coverage: 0.5
 
 warnings:
@@ -87,6 +87,7 @@ properties:
 
 regression:
   max_answer_flip_rate: 0.05
+  max_mean_tv_distance: 0.03
   max_accuracy_drop: 0.02
   max_ece_increase: 0.05
   segment_by: [locale]

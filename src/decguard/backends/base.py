@@ -7,9 +7,9 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Any, ClassVar, Literal, Self, TypeVar
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
-from decguard._validation import format_validation_error
+from decguard._validation import format_validation_error, redact_sensitive_values
 from decguard.contracts.models import BackendConfig
 from decguard.decisions import (
     DEFAULT_PROBABILITY_TOLERANCE,
@@ -34,6 +34,8 @@ class BackendMetadata(BaseModel):
     model: str | None = None
     model_version: str | None = None
     details: dict[str, Any] = {}
+
+    _redact_details = field_validator("details", mode="before")(redact_sensitive_values)
 
 
 class HealthStatus(BaseModel):

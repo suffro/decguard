@@ -14,17 +14,25 @@ from decguard import __version__
 from decguard._validation import format_validation_error
 from decguard.backends.base import BackendMetadata, HealthStatus
 from decguard.contracts.loader import LoadedContract
-from decguard.contracts.models import Evaluation
+from decguard.contracts.models import Evaluation, Gates
 from decguard.decisions import (
     DEFAULT_PROBABILITY_TOLERANCE,
     TOLERANCE_CONTEXT_KEY,
     DecisionInput,
+    DecisionResult,
+    DecisionSpec,
     DecisionType,
 )
 from decguard.errors import ReportError
 from decguard.metrics import Metrics, compute_metrics
 from decguard.reports.gates import Check, Status, evaluate_gates, overall_status
-from decguard.reports.properties import PropertyRun, property_checks, rejudge, verify_run
+from decguard.reports.properties import (
+    PropertyRun,
+    property_checks,
+    rejudge,
+    summarize,
+    verify_run,
+)
 from decguard.runner import CaseRecord
 
 REPORT_VERSION: Final = "0.1"
@@ -81,6 +89,8 @@ class Report(_Section):
     backend: BackendMetadata
     health: HealthStatus | None = None
     evaluation: Evaluation
+    requirements: Gates
+    warnings: Gates
     metrics: Metrics
     checks: list[Check]
     failures: list[Failure]
@@ -89,12 +99,104 @@ class Report(_Section):
     """Metamorphic property results (modes ``fuzz`` and ``all``)."""
 
     @model_validator(mode="after")
-    def _check_properties(self) -> Report:
+    def _check_integrity(self) -> Report:
         if (self.mode == "test") != (self.properties is None):
             raise ValueError("'properties' must be present exactly in 'fuzz' and 'all' reports")
+
+        try:
+            spec = DecisionSpec(
+                name=self.contract.name,
+                type=self.contract.type,
+                labels=self.contract.labels,
+            )
+        except ValidationError as exc:
+            raise ValueError("report contract decision is invalid") from exc
+        if not self.results:
+            raise ValueError("report contains no case results")
+        records: dict[str, CaseRecord] = {}
+        for record in self.results:
+            if record.case_id in records:
+                raise ValueError(f"duplicate case id {record.case_id!r}")
+            records[record.case_id] = record
+            if record.expected is not None and record.expected not in spec.labels:
+                raise ValueError(
+                    f"case {record.case_id!r}: expected {record.expected!r} is not a report label"
+                )
+            if record.result is not None:
+                self._check_result_context(record.result, expected_case_id=record.case_id)
+
+        if (self.dataset.n_cases, self.dataset.n_labeled) != (
+            len(self.results),
+            sum(record.expected is not None for record in self.results),
+        ):
+            raise ValueError("dataset counts do not match stored case results")
+
+        metrics = compute_metrics(spec, self.results, self.evaluation)
+        if metrics != self.metrics:
+            raise ValueError("metrics do not match stored case results")
+        if collect_failures(self.results) != self.failures:
+            raise ValueError("failures do not match stored case results")
+
+        properties = self.properties
         if self.properties is not None:
-            verify_run(self.properties, self.records_by_id())
+            verify_run(self.properties, records)
+            for pair in self.properties.pairs:
+                if pair.result is not None:
+                    self._check_result_context(pair.result, expected_case_id=pair.id)
+                if pair.reduced is not None:
+                    self._check_result_context(pair.reduced.result, expected_case_id=pair.id)
+            summary_names = [summary.property for summary in self.properties.summaries]
+            if len(summary_names) != len(set(summary_names)):
+                raise ValueError("property summaries contain duplicate properties")
+            enabled = self.properties.config.configured()
+            if any(name not in enabled for name in summary_names):
+                raise ValueError("property summaries contain a property not in configuration")
+            summaries = tuple(
+                summarize(
+                    name,
+                    enabled[name],
+                    self.properties.pairs,
+                    self.properties.skipped,
+                    len(self.results),
+                )
+                for name in summary_names
+            )
+            if summaries != self.properties.summaries:
+                raise ValueError("property summaries do not match stored transformed cases")
+
+        checks: list[Check] = []
+        if self.mode in ("test", "all"):
+            checks, _ = evaluate_gates(self.requirements, self.warnings, metrics)
+        if properties is not None:
+            checks += property_checks(properties, properties.config)
+        if checks != self.checks:
+            raise ValueError("checks do not match stored metrics and configuration")
+        status = overall_status(checks)
+        if self.status is not status or self.exit_code != EXIT_CODES[status]:
+            raise ValueError("status/exit_code do not match stored checks")
         return self
+
+    def _check_result_context(self, result: DecisionResult, *, expected_case_id: str) -> None:
+        expected = (
+            expected_case_id,
+            self.contract.name,
+            self.contract.type,
+            self.contract.labels,
+            self.backend.name,
+            self.backend.provider,
+        )
+        actual = (
+            result.case_id,
+            result.decision,
+            result.decision_type,
+            result.labels,
+            result.backend,
+            result.provider,
+        )
+        if actual != expected:
+            raise ValueError(
+                f"result {result.case_id!r} does not match the report decision/backend context"
+            )
 
     def records_by_id(self) -> dict[str, CaseRecord]:
         return {record.case_id: record for record in self.results}
@@ -169,6 +271,8 @@ def build_report(
         backend=backend,
         health=health,
         evaluation=contract.evaluation,
+        requirements=contract.requirements,
+        warnings=contract.warnings,
         metrics=metrics,
         checks=checks,
         failures=collect_failures(records),

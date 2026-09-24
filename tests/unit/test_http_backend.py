@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 import pytest
 
-from decguard.backends import HttpBackend, HttpSettings, create_backend
+from decguard.backends import BackendMetadata, HttpBackend, HttpSettings, create_backend
 from decguard.contracts import BackendConfig
 from decguard.decisions import DecisionRequest, DecisionSpec, DecisionType
 from decguard.errors import (
@@ -108,7 +108,7 @@ def test_label_map_must_target_contract_labels() -> None:
             InvalidResponse,
             "'model' must be a string",
         ),
-        (httpx.Response(400, text="bad request"), BackendError, "HTTP 400: bad request"),
+        (httpx.Response(400, text="bad request"), BackendError, "HTTP 400"),
         (httpx.Response(503), BackendUnavailable, "HTTP 503"),
         (httpx.Response(302, headers={"Location": "https://evil.test"}), BackendError, "HTTP 302"),
     ],
@@ -187,6 +187,7 @@ def test_missing_credential_env_is_a_configuration_error(monkeypatch: pytest.Mon
         ({"url": URL, "headers": {"Authorization": "Bearer x"}}, "looks like a credential"),
         ({"url": URL, "headers": {"X-API-Key": "x"}}, "looks like a credential"),
         ({"url": "https://user:pw@host.test/decide"}, "must not embed credentials"),
+        ({"url": URL + "?api_key=literal"}, "query parameter 'api_key' looks like"),
         ({"url": "ftp://host.test/decide"}, "http:// or https://"),
         ({"url": "/relative"}, "http:// or https://"),
         ({"url": URL, "timeout_s": 0}, "timeout_s"),
@@ -194,6 +195,14 @@ def test_missing_credential_env_is_a_configuration_error(monkeypatch: pytest.Mon
         (
             {"url": URL, "bearer_token_env": "A", "headers_from_env": {"Authorization": "B"}},
             "not both",
+        ),
+        (
+            {
+                "url": URL,
+                "health_url": "https://health.other.test/status",
+                "bearer_token_env": "A",
+            },
+            "health_url must use the backend URL's origin",
         ),
     ],
 )
@@ -203,10 +212,44 @@ def test_settings_validation(settings: dict[str, Any], message: str) -> None:
 
 
 def test_metadata_redacts_query_string() -> None:
-    http = HttpBackend(HttpSettings(url=URL + "?api_key=" + SECRET), model="m")
+    http = HttpBackend(HttpSettings(url=URL + "?trace=" + SECRET), model="m")
     details = http.metadata().details
     assert details["url"] == URL
     assert SECRET not in json.dumps(details)
+
+
+def test_error_response_body_is_not_recorded() -> None:
+    secret_body = f"upstream rejected credential {SECRET}"
+    with pytest.raises(BackendError) as caught:
+        backend(lambda request: httpx.Response(401, text=secret_body)).decide(REQUEST)
+    assert SECRET not in str(caught.value)
+    assert secret_body not in str(caught.value)
+
+
+def test_response_and_backend_metadata_redact_sensitive_values() -> None:
+    result = backend(
+        ok(
+            {
+                "probabilities": {"yes": 1.0, "no": 0.0},
+                "metadata": {
+                    "token": SECRET,
+                    "nested": {"api-key": SECRET},
+                    "tokens": 12,
+                },
+            }
+        )
+    ).decide(REQUEST)
+    metadata = result.model_dump_json()
+    assert SECRET not in metadata
+    assert result.metadata == {
+        "token": "[REDACTED]",
+        "nested": {"api-key": "[REDACTED]"},
+        "tokens": 12,
+    }
+    backend_metadata = BackendMetadata(
+        name="remote", provider="plugin", details={"password": SECRET, "region": "eu"}
+    )
+    assert SECRET not in backend_metadata.model_dump_json()
 
 
 def test_healthcheck() -> None:

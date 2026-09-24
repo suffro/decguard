@@ -41,6 +41,9 @@ from decguard.errors import (
 PROTOCOL = "decguard.http/0.1"
 _RETRYABLE_STATUS = frozenset({502, 503, 504})
 _SECRET_HEADERS = frozenset({"authorization", "proxy-authorization", "x-api-key", "api-key"})
+_SECRET_QUERY_KEYS = frozenset(
+    {"api_key", "apikey", "access_token", "token", "key", "signature", "auth", "password"}
+)
 
 
 def _check_url(value: str | None) -> str | None:
@@ -49,11 +52,19 @@ def _check_url(value: str | None) -> str | None:
     try:
         url = httpx.URL(value)
     except httpx.InvalidURL as exc:
-        raise ValueError(f"invalid URL: {exc}") from exc
+        raise ValueError("invalid URL") from exc
     if url.scheme not in {"http", "https"} or not url.host:
         raise ValueError("must be an absolute http:// or https:// URL")
     if url.userinfo:
         raise ValueError("must not embed credentials; use bearer_token_env or headers_from_env")
+    secret_query = next(
+        (key for key, _ in url.params.multi_items() if key.lower() in _SECRET_QUERY_KEYS), None
+    )
+    if secret_query is not None:
+        raise ValueError(
+            f"query parameter {secret_query!r} looks like a credential; use an environment "
+            "variable and a request header"
+        )
     return value
 
 
@@ -92,6 +103,18 @@ class HttpSettings(StrictModel):
         from_env = {header.lower() for header in self.headers_from_env}
         if self.bearer_token_env and "authorization" in from_env:
             raise ValueError("set either bearer_token_env or an Authorization header, not both")
+        if self.health_url is not None and (self.bearer_token_env or self.headers_from_env):
+            target = httpx.URL(self.url)
+            health = httpx.URL(self.health_url)
+            if (target.scheme, target.host, target.port) != (
+                health.scheme,
+                health.host,
+                health.port,
+            ):
+                raise ValueError(
+                    "health_url must use the backend URL's origin when environment headers "
+                    "are configured"
+                )
         return self
 
 
@@ -198,10 +221,9 @@ class HttpBackend(DecisionBackend):
         if response.status_code in _RETRYABLE_STATUS:
             raise BackendUnavailable(f"backend {self.name!r} returned HTTP {response.status_code}")
         if not response.is_success:
-            raise BackendError(
-                f"backend {self.name!r} returned HTTP {response.status_code}: "
-                + response.text[:200]
-            )
+            # Response bodies are untrusted and can echo credentials or private input.
+            # Keep case errors useful without persisting arbitrary server text in reports.
+            raise BackendError(f"backend {self.name!r} returned HTTP {response.status_code}")
         return self._parse(response)
 
     def _parse(self, response: httpx.Response) -> Prediction:

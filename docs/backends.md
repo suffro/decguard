@@ -63,8 +63,11 @@ backend:
 ```
 
 Credentials are read from environment variables when the first request is made. Literal
-`Authorization`/API-key headers and credentials in URLs are rejected. Reports store the
-URL without its query string. Redirects are not followed.
+`Authorization`/API-key headers, URL userinfo and credential-like query parameters are
+rejected. When environment-backed headers are configured, `health_url` must have the same
+origin as `url`, so a healthcheck cannot forward credentials elsewhere. Reports store the
+URL without its query string. Redirects are not followed, untrusted HTTP error bodies are
+not recorded, and values under common credential keys in backend metadata are redacted.
 
 ### Protocol `decguard.http/0.1`
 
@@ -158,3 +161,19 @@ class OpenJevBackend(DecisionBackend):
 Then `provider: openjev` works in any contract. Built-in provider names cannot be
 shadowed by plugins. Backends are called from several threads at once (up to
 `evaluation.max_concurrency`), so `predict` must be thread-safe.
+
+## Opt-in real-backend validation
+
+The release suite includes an opt-in test that must call a real, non-`mock` backend and
+produce at least one valid decision:
+
+```bash
+DECGUARD_EXTERNAL_CONTRACT=/absolute/path/to/real-decguard.yaml \
+  uv run pytest -m external
+```
+
+The contract must reference a reachable endpoint implementing `decguard.http/0.1` (or an
+installed backend plugin), include a real dataset, and name credentials only through
+environment variables. TypeSafe/Kev-style `POST /v1/systemone` servers use a different
+`state`/`questions`/`answers` wire format and therefore require a separately operated
+adapter or proxy; pointing the built-in `http` backend directly at one is not compatible.

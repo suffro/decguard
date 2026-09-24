@@ -56,17 +56,41 @@ jobs:
           /tmp/clean/bin/decguard validate examples/refund/decguard.yaml
           /tmp/clean/bin/decguard test examples/refund/decguard.yaml --output report.json
           /tmp/clean/bin/decguard test examples/refund/decguard.yaml --all
-          # A declared property violation must fail CI (exit 1), and replay must reproduce it.
+          # Property, calibration, regression and production drift failures must exit 1.
           set +e
           /tmp/clean/bin/decguard fuzz examples/refund/decguard.yaml -b order_sensitive --output fuzz.json
           fuzz_code=$?
           /tmp/clean/bin/decguard replay fuzz.json
           replay_code=$?
+          /tmp/clean/bin/decguard test examples/refund/decguard.yaml -b order_sensitive --output candidate.json
+          calibration_code=$?
+          /tmp/clean/bin/decguard diff report.json candidate.json --contract examples/refund/decguard.yaml --output diff.json
+          diff_code=$?
+          /tmp/clean/bin/decguard check examples/refund/decguard.yaml \
+            --dataset examples/refund/production-drift.jsonl \
+            --baseline examples/refund/production.jsonl \
+            --output drift-report.json
+          drift_code=$?
           set -e
-          test "$fuzz_code" -eq 1 && test "$replay_code" -eq 1
+          test "$fuzz_code" -eq 1
+          test "$replay_code" -eq 1
+          test "$calibration_code" -eq 1
+          test "$diff_code" -eq 1
+          test "$drift_code" -eq 1
           /tmp/clean/bin/decguard diff report.json report.json --contract examples/refund/decguard.yaml
           /tmp/clean/bin/decguard check examples/refund/decguard.yaml --dataset examples/refund/production.jsonl --output production-report.json
           /tmp/clean/bin/decguard run examples/refund/decguard.yaml "The blender arrived damaged"
+          /tmp/clean/bin/decguard run examples/refund/decguard.yaml "The parcel never arrived"
+          /tmp/clean/bin/decguard run examples/refund/decguard.yaml "Can someone call me?"
+          /tmp/clean/bin/python - <<'PY'
+          from decguard import DecGuard
+
+          with DecGuard.from_contract("examples/refund/decguard.yaml") as guard:
+              assert guard.decide("The blender arrived damaged").action == "accept"
+              fallback = guard.decide("The parcel never arrived")
+              assert (fallback.action, fallback.fallback_backend) == ("fallback", "strong_model")
+              assert guard.decide("Can someone call me?").action == "human_review"
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: dist

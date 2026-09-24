@@ -6,6 +6,22 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+_SENSITIVE_KEYS = frozenset(
+    {
+        "api_key",
+        "apikey",
+        "authorization",
+        "access_token",
+        "refresh_token",
+        "token",
+        "password",
+        "secret",
+        "client_secret",
+        "cookie",
+        "set_cookie",
+    }
+)
+
 
 class StrictModel(BaseModel):
     """Immutable model that rejects unknown keys, so typos never pass silently."""
@@ -43,3 +59,20 @@ def reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise ValueError(f"duplicate key {key!r}")
         result[key] = value
     return result
+
+
+def redact_sensitive_values(value: Any) -> Any:
+    """Redact values under common credential keys in untrusted metadata."""
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            normalized = key.lower().replace("-", "_") if isinstance(key, str) else ""
+            redacted[key] = (
+                "[REDACTED]" if normalized in _SENSITIVE_KEYS else redact_sensitive_values(item)
+            )
+        return redacted
+    if isinstance(value, list):
+        return [redact_sensitive_values(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive_values(item) for item in value)
+    return value
