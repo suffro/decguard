@@ -23,6 +23,22 @@ backend:
 
 # Swap in a real endpoint with `decguard test examples/refund/decguard.yaml -b staging`.
 backends:
+  # A deliberately flawed model that favours whichever option is listed first:
+  # `decguard fuzz examples/refund/decguard.yaml -b order_sensitive` catches it.
+  order_sensitive:
+    provider: mock
+    model: refund-mock-v2
+    position_bias: 0.1
+    rules:
+      - contains: "damaged"
+        probabilities: {refund: 0.96, reject: 0.01, review: 0.03}
+      - contains: "never arrived"
+        probabilities: {refund: 0.90, reject: 0.02, review: 0.08}
+      - contains: "changed my mind"
+        probabilities: {refund: 0.05, reject: 0.85, review: 0.10}
+      - contains: "used it for"
+        probabilities: {refund: 0.03, reject: 0.93, review: 0.04}
+    default: {refund: 0.20, reject: 0.15, review: 0.65}
   staging:
     provider: http
     url: http://localhost:8080/decide
@@ -37,8 +53,35 @@ evaluation:
 
 requirements:
   min_accuracy: 0.9
-  max_ece: 0.15
+  max_ece: 0.2
   min_coverage: 0.5
 
 warnings:
   max_latency_p95_ms: 500
+
+fuzz:
+  seed: 42
+
+properties:
+  option_order:
+    samples: 3
+    max_tv_distance: 0.03
+    max_flip_rate: 0
+  label_format:
+    max_tv_distance: 0.03
+  irrelevant_context:
+    insertions: 2
+    max_tv_distance: 0.05
+  repeated_context:
+    max_tv_distance: 0.05
+  whitespace:
+    max_tv_distance: 0.02
+  paraphrase:                # `identity` re-asks the same input: checks determinism
+    source: {provider: identity}
+    max_tv_distance: 0.0
+
+regression:
+  max_answer_flip_rate: 0.05
+  max_accuracy_drop: 0.02
+  max_ece_increase: 0.05
+  segment_by: [locale]

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -18,6 +18,9 @@ from decguard.decisions import (
     DecisionSpec,
 )
 from decguard.errors import BackendError, DecGuardError
+
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 class CaseError(BaseModel):
@@ -51,27 +54,48 @@ class CaseRecord(BaseModel):
         return self
 
 
+def decide_safely(
+    backend: DecisionBackend, request: DecisionRequest, tolerance: float
+) -> DecisionResult | CaseError:
+    """Decide one request; per-request failures become a :class:`CaseError`."""
+    try:
+        return backend.decide(request, tolerance=tolerance)
+    except BackendError as exc:
+        return CaseError(kind=exc.kind, message=str(exc))
+    except DecGuardError:
+        raise  # configuration problems abort the run
+    except Exception as exc:  # a buggy plugin must not silently drop cases
+        return CaseError(kind="exception", message=f"{type(exc).__name__}: {exc}")
+
+
+def map_ordered(fn: Callable[[T], R], items: Sequence[T], *, max_concurrency: int) -> list[R]:
+    """``[fn(item) for item in items]`` on at most ``max_concurrency`` threads, in order."""
+    if max_concurrency <= 1 or len(items) <= 1:
+        return [fn(item) for item in items]
+    with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
+        futures: list[Future[R]] = [pool.submit(fn, item) for item in items]
+        try:
+            return [future.result() for future in futures]
+        except BaseException:
+            for future in futures:
+                future.cancel()
+            raise
+
+
 def _run_one(
     backend: DecisionBackend, spec: DecisionSpec, case: Case, tolerance: float
 ) -> CaseRecord:
     request = DecisionRequest(case_id=case.id, decision=spec, input=case.input)
+    outcome = decide_safely(backend, request, tolerance)
     base = {
         "case_id": case.id,
         "input": case.input,
         "expected": case.expected,
         "metadata": case.metadata,
     }
-    try:
-        result = backend.decide(request, tolerance=tolerance)
-    except BackendError as exc:
-        return CaseRecord(**base, error=CaseError(kind=exc.kind, message=str(exc)))
-    except DecGuardError:
-        raise  # configuration problems abort the run
-    except Exception as exc:  # a buggy plugin must not silently drop cases
-        return CaseRecord(
-            **base, error=CaseError(kind="exception", message=f"{type(exc).__name__}: {exc}")
-        )
-    return CaseRecord(**base, result=result)
+    if isinstance(outcome, CaseError):
+        return CaseRecord(**base, error=outcome)
+    return CaseRecord(**base, result=outcome)
 
 
 def run_cases(
@@ -83,15 +107,8 @@ def run_cases(
     tolerance: float = DEFAULT_PROBABILITY_TOLERANCE,
 ) -> list[CaseRecord]:
     """Decide every case. Records come back in dataset order whatever the concurrency."""
-    if max_concurrency <= 1:
-        return [_run_one(backend, spec, case, tolerance) for case in cases]
-    with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
-        futures: list[Future[CaseRecord]] = [
-            pool.submit(_run_one, backend, spec, case, tolerance) for case in cases
-        ]
-        try:
-            return [future.result() for future in futures]
-        except BaseException:
-            for future in futures:
-                future.cancel()
-            raise
+    return map_ordered(
+        lambda case: _run_one(backend, spec, case, tolerance),
+        cases,
+        max_concurrency=max_concurrency,
+    )

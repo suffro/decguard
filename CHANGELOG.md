@@ -29,3 +29,40 @@ versioned separately.
 - CLI: `decguard validate`, `decguard test`, `decguard report` (with re-evaluation against
   an edited contract). Exit codes: 0 pass/warn, 1 gate failed, 2 configuration/runtime
   error.
+- Metamorphic properties (contract `properties` and `fuzz` sections):
+  - `option_order`, `label_format`, `irrelevant_context`, `repeated_context`, `whitespace`
+    and `paraphrase`;
+  - noul `inversion` (the answer must swap);
+  - score `monotonic` (the score must not move against a declared direction).
+
+  Transformed options are sent as shown and mapped back to contract labels.
+- Distribution-aware comparisons: total variation distance, Jensen-Shannon divergence, max
+  absolute delta, confidence delta, answer flip, rank change, expected-level delta. Limits
+  apply per transformed case, plus aggregate violation and flip rates, at requirement or
+  warning level.
+- Deterministic fuzzing:
+  - a SHA-256 random stream keyed by (seed, property, case id);
+  - greedy minimization of failing transformations;
+  - untransformable cases are recorded with a reason, never dropped.
+- Paraphrase providers: `identity`, `file` (curated JSONL), `openai` (OpenAI-compatible,
+  optional), plus plugins via the `decguard.paraphrasers` entry-point group.
+- Reports gain `mode` (`test`/`fuzz`/`all`) and a `properties` section. On load, stored
+  comparisons and violations are checked against their results and recorded settings.
+  `decguard report --contract` re-applies edited property limits.
+- `decguard fuzz`, `decguard test --all`, `decguard replay` (re-sends stored failures,
+  checks the seed regenerates them, exit 1 if reproduced) and `decguard diff`. `diff`
+  covers:
+  - answer flips, confidence and distribution shifts;
+  - accuracy, calibration and latency deltas;
+  - new and recovered errors, per-segment changes;
+  - contract `regression` gates, with an implicit `max_error_rate_increase: 0`.
+- Mock backend: `position_bias`, a deliberate order-sensitivity defect for demos. The
+  mock also understands reordered and reformatted options.
+
+### Changed
+
+- Replay treats transformed-case backend errors as Step-2 failures and reproduces them
+  only when the backend returns the same stable error kind.
+- Mock rules match ignoring whitespace differences as well as case.
+- Examples declare properties; `severity` uses object inputs (`text`, `affected_users`).
+  The refund example's `max_ece` is 0.2.

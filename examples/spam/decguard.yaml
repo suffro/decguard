@@ -22,3 +22,11 @@ requirements:
   min_accuracy: 0.9
   min_macro_f1: 0.85
   max_brier: 0.25
+
+properties:
+  label_format:           # surface variation of the yes/no labels: SPAM/HAM, "spam", ...
+    styles: [upper, capitalized, quoted]
+    max_tv_distance: 0.02
+  irrelevant_context:
+    max_tv_distance: 0.05
+    max_flip_rate: 0

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from decguard import __version__
 from decguard._validation import format_validation_error
@@ -23,7 +23,8 @@ from decguard.decisions import (
 )
 from decguard.errors import ReportError
 from decguard.metrics import Metrics, compute_metrics
-from decguard.reports.gates import Check, Status, evaluate_gates
+from decguard.reports.gates import Check, Status, evaluate_gates, overall_status
+from decguard.reports.properties import PropertyRun, property_checks, rejudge, verify_run
 from decguard.runner import CaseRecord
 
 REPORT_VERSION: Final = "0.1"
@@ -63,10 +64,15 @@ class Failure(_Section):
     error: str | None = None
 
 
+Mode = Literal["test", "fuzz", "all"]
+"""``test``: golden gates; ``fuzz``: property checks; ``all``: both."""
+
+
 class Report(_Section):
     report_version: Literal["0.1"] = REPORT_VERSION
     decguard_version: str
     created_at: str
+    mode: Mode = "test"
     status: Status
     exit_code: int
     """0 for pass/warn, 1 for fail (``--fail-on-warn`` makes the CLI exit 1 on warn too)."""
@@ -79,6 +85,19 @@ class Report(_Section):
     checks: list[Check]
     failures: list[Failure]
     results: list[CaseRecord]
+    properties: PropertyRun | None = None
+    """Metamorphic property results (modes ``fuzz`` and ``all``)."""
+
+    @model_validator(mode="after")
+    def _check_properties(self) -> Report:
+        if (self.mode == "test") != (self.properties is None):
+            raise ValueError("'properties' must be present exactly in 'fuzz' and 'all' reports")
+        if self.properties is not None:
+            verify_run(self.properties, self.records_by_id())
+        return self
+
+    def records_by_id(self) -> dict[str, CaseRecord]:
+        return {record.case_id: record for record in self.results}
 
 
 def collect_failures(records: Sequence[CaseRecord]) -> list[Failure]:
@@ -119,15 +138,23 @@ def build_report(
     records: Sequence[CaseRecord],
     *,
     health: HealthStatus | None = None,
+    mode: Mode = "test",
+    properties: PropertyRun | None = None,
 ) -> Report:
     """Evaluate records against a contract. A pure function of its inputs (bar the timestamp)."""
     contract = loaded.contract
     spec = contract.spec()
     metrics = compute_metrics(spec, records, contract.evaluation)
-    checks, status = evaluate_gates(contract.requirements, contract.warnings, metrics)
+    checks: list[Check] = []
+    if mode in ("test", "all"):
+        checks, _ = evaluate_gates(contract.requirements, contract.warnings, metrics)
+    if properties is not None:
+        checks += property_checks(properties, properties.config)
+    status = overall_status(checks)
     return Report(
         decguard_version=__version__,
         created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        mode=mode,
         status=status,
         exit_code=EXIT_CODES[status],
         contract=ContractInfo(
@@ -146,11 +173,11 @@ def build_report(
         checks=checks,
         failures=collect_failures(records),
         results=list(records),
+        properties=properties,
     )
 
 
-def reevaluate(report: Report, loaded: LoadedContract) -> Report:
-    """Re-apply a (possibly edited) contract's gates to a stored report's results."""
+def ensure_same_decision(report: Report, loaded: LoadedContract) -> None:
     spec = loaded.contract.spec()
     if (spec.name, spec.type, spec.labels) != (
         report.contract.name,
@@ -162,8 +189,25 @@ def reevaluate(report: Report, loaded: LoadedContract) -> Report:
             f"but the report is for {report.contract.name!r} ({report.contract.type}, "
             f"{list(report.contract.labels)})"
         )
+
+
+def reevaluate(report: Report, loaded: LoadedContract) -> Report:
+    """Re-apply a (possibly edited) contract's gates to a stored report's results.
+
+    Property tolerances and levels are re-applied to the stored transformed cases;
+    transformations are not regenerated."""
+    ensure_same_decision(report, loaded)
+    properties = report.properties
+    if properties is not None:
+        properties = rejudge(properties, loaded.contract.properties, report.records_by_id())
     return build_report(
-        loaded, report.dataset, report.backend, report.results, health=report.health
+        loaded,
+        report.dataset,
+        report.backend,
+        report.results,
+        health=report.health,
+        mode=report.mode,
+        properties=properties,
     )
 
 

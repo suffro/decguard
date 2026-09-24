@@ -50,17 +50,28 @@ class Check(BaseModel):
     message: str
 
 
-def _check(gate: str, threshold: float, level: Level, values: dict[str, float | None]) -> Check:
-    metric, comparison = GATES[gate]
-    value = values[metric]
+def make_check(
+    gate: str,
+    metric: str,
+    comparison: Literal[">=", "<="],
+    threshold: float,
+    value: float | None,
+    *,
+    level: Level,
+    missing: str = "no eligible cases",
+    detail: str = "",
+) -> Check:
+    """A check that ``value comparison threshold`` holds. A missing value fails."""
     if value is None:
         holds = False
-        message = f"{metric} could not be computed (no eligible cases)"
+        message = f"{metric} could not be computed ({missing})"
     else:
         holds = value >= threshold if comparison == ">=" else value <= threshold
         message = f"{metric} {value:.4g} {comparison} {threshold:g}"
         if not holds:
             message = f"{metric} {value:.4g} violates {comparison} {threshold:g}"
+    if detail:
+        message += f" ({detail})"
     failed = Status.FAIL if level == "requirement" else Status.WARN
     return Check(
         gate=gate,
@@ -72,6 +83,19 @@ def _check(gate: str, threshold: float, level: Level, values: dict[str, float | 
         status=Status.PASS if holds else failed,
         message=message,
     )
+
+
+def _check(gate: str, threshold: float, level: Level, values: dict[str, float | None]) -> Check:
+    metric, comparison = GATES[gate]
+    return make_check(gate, metric, comparison, threshold, values[metric], level=level)
+
+
+def overall_status(checks: list[Check]) -> Status:
+    if any(c.status is Status.FAIL for c in checks):
+        return Status.FAIL
+    if any(c.status is Status.WARN for c in checks):
+        return Status.WARN
+    return Status.PASS
 
 
 def evaluate_gates(
@@ -88,8 +112,4 @@ def evaluate_gates(
     required.setdefault("max_error_rate", 0.0)
     checks = [_check(gate, t, "requirement", values) for gate, t in required.items()]
     checks += [_check(gate, t, "warning", values) for gate, t in warnings.configured().items()]
-    if any(c.status is Status.FAIL for c in checks):
-        return checks, Status.FAIL
-    if any(c.status is Status.WARN for c in checks):
-        return checks, Status.WARN
-    return checks, Status.PASS
+    return checks, overall_status(checks)

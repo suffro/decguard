@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from decguard._validation import StrictModel
+from decguard.contracts.properties import Fuzz, Properties, Regression
 from decguard.decisions.types import DecisionSpec, DecisionType
 from decguard.errors import ContractError
 
@@ -148,6 +149,11 @@ class Contract(StrictModel):
     """Hard gates: any violation fails the run (exit code 1)."""
     warnings: Gates = Gates()
     """Soft gates: violations turn PASS into WARN."""
+    properties: Properties = Properties()
+    """Metamorphic properties checked by ``decguard fuzz`` and ``decguard test --all``."""
+    fuzz: Fuzz = Fuzz()
+    regression: Regression = Regression()
+    """Gates applied by ``decguard diff``."""
 
     @field_validator("schema_version", mode="before")
     @classmethod
@@ -183,6 +189,22 @@ class Contract(StrictModel):
                     )
             if "max_ordinal_mae" in configured and self.decision.type != "score":
                 raise ValueError(f"{section}.max_ordinal_mae only applies to score decisions")
+        return self
+
+    @model_validator(mode="after")
+    def _check_properties(self) -> Contract:
+        labels = self.decision.label_order()
+        for name, config in self.properties.configured().items():
+            if self.decision.type not in config.types:
+                raise ValueError(
+                    f"properties.{name} applies to {' and '.join(config.types)} decisions, "
+                    f"not {self.decision.type}"
+                )
+        label_format = self.properties.label_format
+        if label_format is not None:
+            unknown = sorted(set(label_format.aliases) - set(labels))
+            if unknown:
+                raise ValueError(f"properties.label_format.aliases: unknown labels {unknown}")
         return self
 
     def spec(self) -> DecisionSpec:

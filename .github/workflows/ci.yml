@@ -55,6 +55,16 @@ jobs:
           /tmp/clean/bin/decguard --version
           /tmp/clean/bin/decguard validate examples/refund/decguard.yaml
           /tmp/clean/bin/decguard test examples/refund/decguard.yaml --output report.json
+          /tmp/clean/bin/decguard test examples/refund/decguard.yaml --all
+          # A declared property violation must fail CI (exit 1), and replay must reproduce it.
+          set +e
+          /tmp/clean/bin/decguard fuzz examples/refund/decguard.yaml -b order_sensitive --output fuzz.json
+          fuzz_code=$?
+          /tmp/clean/bin/decguard replay fuzz.json
+          replay_code=$?
+          set -e
+          test "$fuzz_code" -eq 1 && test "$replay_code" -eq 1
+          /tmp/clean/bin/decguard diff report.json report.json --contract examples/refund/decguard.yaml
       - uses: actions/upload-artifact@v4
         with:
           name: dist

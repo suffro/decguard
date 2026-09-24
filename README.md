@@ -7,9 +7,10 @@ DecGuard sits above your decision backends. You describe the decision once in a 
 **contract**, run a dataset through any backend, and get one reproducible **reliability
 report** with CI-friendly PASS / WARN / FAIL gates.
 
-> Status: pre-release (`0.1.0.dev0`). Step 1 of the v0.1 plan is implemented: contracts,
-> backends, golden-dataset testing, metrics, reports and CLI. Metamorphic fuzzing,
-> regression diffs, post-deployment checks and fallback policies come next.
+> Status: pre-release (`0.1.0.dev0`). Steps 1 and 2 of the v0.1 plan are implemented:
+> contracts, backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
+> regression diffs and failure replay. Post-deployment checks and fallback policies come
+> next.
 
 ## 5-minute quickstart
 
@@ -28,8 +29,8 @@ DecGuard 0.1.0.dev0 · refund_request (choice) · PASS
   Selective    confidence >= 0.8: coverage 0.727   abstention 0.273   accuracy 1.000
   ...
   Checks
-    PASS  min_accuracy             accuracy 1 >= 0.9
-    PASS  max_ece                  ece 0.139 <= 0.15
+    PASS  min_accuracy                           accuracy 1 >= 0.9
+    PASS  max_ece                                ece 0.139 <= 0.2
     ...
 PASS: all gates hold
 ```
@@ -63,12 +64,42 @@ warnings:                     # soft gates -> WARN
   max_latency_p95_ms: 300
 ```
 
+### Find what golden tests miss
+
+The refund example also defines `order_sensitive`, a backend that quietly favours whichever
+option is listed first. Its golden results pass. The metamorphic properties catch it:
+
+```bash
+decguard test examples/refund/decguard.yaml -b order_sensitive       # PASS
+decguard fuzz examples/refund/decguard.yaml -b order_sensitive -o fuzz.json
+```
+
+```text
+  Properties   seed 42
+    option_order         33 compared · 27 violating (81.8%) · flips 0 (0.0%) · max TV 0.100
+    label_format         22 compared · 0 violating (0.0%) · flips 0 (0.0%) · max TV 0.000
+    ...
+    FAIL  option_order.max_violation_rate        option_order.violation_rate 0.8182 violates <= 0 (per case: ...)
+  Property failures (10 of 27; replay with `decguard replay`)
+    option_order/r1/0
+      tv_distance 0.1 > 0.03
+      sent: options [reject, refund, review] · The blender arrived damaged and won't turn on.
+FAIL: at least one requirement does not hold
+```
+
+`decguard replay fuzz.json` re-sends the stored failures; `decguard diff baseline.json
+candidate.json --contract decguard.yaml` compares two runs for regressions.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `decguard validate <contract>` | Check the contract, backend settings and dataset offline. |
 | `decguard test <contract>` | Run the dataset through a backend (`--backend NAME` picks a named one), print the report, `--output report.json` to keep it. |
+| `decguard fuzz <contract>` | Check the contract's metamorphic properties (option order, label format, irrelevant context, whitespace, paraphrase, noul inversion, score monotonicity); deterministic per `--seed`. |
+| `decguard test <contract> --all` | Golden gates and properties in one report. |
+| `decguard replay <report.json>` | Re-send stored property failures (`--id` for one); exit 1 if they still fail. |
+| `decguard diff <baseline.json> <candidate.json>` | Answer flips, confidence/distribution shifts, calibration, latency, error and per-segment changes; `--contract` applies `regression` gates. |
 | `decguard report <report.json>` | Show a stored report; `--contract` re-applies (possibly edited) gates without re-running the model. |
 
 Exit codes: **0** pass (or warn; `--fail-on-warn` turns warn into 1), **1** a reliability
@@ -79,17 +110,22 @@ output on stdout.
 
 ```yaml
 - run: uv tool install git+https://github.com/suffro/decguard
-- run: decguard test decguard.yaml --output decguard-report.json
+- run: decguard test decguard.yaml --all --output decguard-report.json
 - uses: actions/upload-artifact@v4
   if: always()
   with: { name: decguard-report, path: decguard-report.json }
 ```
+
+A full workflow with a regression diff is in [docs/ci.md](docs/ci.md).
 
 ## Documentation
 
 - [Decision Contract reference](docs/contracts.md)
 - [Backends and the HTTP protocol](docs/backends.md)
 - [Reports, metrics and gates](docs/reports.md)
+- [Metamorphic properties, fuzzing and replay](docs/properties.md)
+- [Regression diffs](docs/regression.md)
+- [CI with GitHub Actions](docs/ci.md)
 - [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 ## What DecGuard is not

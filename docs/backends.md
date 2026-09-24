@@ -29,15 +29,19 @@ Deterministic and offline, for tests, examples and CI.
 backend:
   provider: mock
   model: refund-mock-v1
-  rules:                       # first case-insensitive substring match wins
+  rules:                       # first match wins, ignoring case and whitespace
     - contains: "damaged"
       probabilities: {refund: 0.96, reject: 0.01, review: 0.03}
   default: {refund: 0.2, reject: 0.15, review: 0.65}   # when no rule matches
   seed: 0                      # without `default`: seeded hash of the input
   model_version: "1"
+  position_bias: 0.0           # deliberate defect: mass moved to the option shown first
 ```
 
-Rule and default distributions are validated against the contract labels up front.
+Rule and default distributions are validated against the contract labels up front. The
+mock reads options as a well-behaved model would: reordered options and reformatted
+labels (`REFUND`, `B) refund`, `"refund"`, `[refund]`) get the same answer. Set
+`position_bias` to simulate an order-sensitive model; `decguard fuzz` should catch it.
 
 ## `http`
 
@@ -76,7 +80,10 @@ Request (`POST url`):
 }
 ```
 
-`labels` are the backend's names (after `label_map`). Response (`200`):
+`labels` are the backend's names (after `label_map`), in the order the options should be
+presented. During fuzzing (`option_order`, `label_format`) they may be reordered or
+reformatted; answer with probabilities keyed by the labels exactly as sent, and DecGuard
+maps them back to the contract labels. Response (`200`):
 
 ```json
 {
