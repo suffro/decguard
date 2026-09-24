@@ -29,6 +29,11 @@ uv run pytest
 CI (`.github/workflows/ci.yml`) runs these on Ubuntu and macOS for Python 3.11–3.13 and
 installs the built wheel in a clean environment.
 
+Real-backend checks are opt-in and never part of the default run (docs/backends.md):
+`uv run pytest -m real_kev` (a Kev server on 127.0.0.1:8009) and
+`uv run pytest -m real_jev` (`OPENROUTER_API_KEY`). Once selected, a missing prerequisite
+is a failure, not a skip. In CI they run only in `.github/workflows/real-backends.yml`.
+
 ## Important rules
 
 - Never print or store secrets; credentials come from environment variables.

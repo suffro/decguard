@@ -16,6 +16,7 @@ from decguard.backends.registry import (
     backend_class,
     create_backend,
 )
+from decguard.backends.systemone import SystemOneBackend, SystemOneSettings
 
 __all__ = [
     "BUILTIN_BACKENDS",
@@ -29,6 +30,8 @@ __all__ = [
     "MockBackend",
     "MockRule",
     "MockSettings",
+    "SystemOneBackend",
+    "SystemOneSettings",
     "available_providers",
     "backend_class",
     "create_backend",

@@ -43,9 +43,90 @@ mock reads options as a well-behaved model would: reordered options and reformat
 labels (`REFUND`, `B) refund`, `"refund"`, `[refund]`) get the same answer. Set
 `position_bias` to simulate an order-sensitive model; `decguard fuzz` should catch it.
 
+## `systemone`
+
+For System One decision APIs: [Kev](https://github.com/jaredpalmer/kev) servers you run
+yourself, TypeSafe's Jev, and Jev through OpenRouter. They share one wire format (`state`,
+typed `questions`, typed `answers`), so one adapter covers all of them.
+
+```yaml
+decision:
+  name: support_team
+  type: choice
+  description: Which team should handle this customer support ticket?   # the question asked
+  options: [billing, shipping, technical]
+
+backend:                                      # Jev through OpenRouter's Decisions API
+  provider: systemone
+  model: typesafe/jev-1.13                    # required; pin a version, not an alias
+  url: https://openrouter.ai/api/alpha/decisions
+  bearer_token_env: OPENROUTER_API_KEY
+  timeout_s: 60
+  max_retries: 2              # connection failures, HTTP 429, 502-504 and 529 only
+
+backends:
+  kev:                                        # a local Kev server
+    provider: systemone
+    model: kev-latest
+    url: http://127.0.0.1:8009/v1/systemone
+    health_url: http://127.0.0.1:8009/v1/models
+  typesafe:                                   # TypeSafe's own API
+    provider: systemone
+    model: jev-1.13.0
+    url: https://api.typesafe.ai/v1/systemone
+    bearer_token_env: TYPESAFE_API_KEY
+
+evaluation:
+  probability_tolerance: 0.02   # Jev rounds probabilities to two decimals (see below)
+```
+
+Settings are those of `http` (URL checks, `health_url`, timeouts, retries, environment
+credentials, `label_map` for choice and score) plus `instructions`, the question asked about
+every input. It defaults to the decision's `description`; one of the two is required.
+
+Each case is sent as one question about the case input, keyed by the decision name:
+
+```json
+{
+  "model": "typesafe/jev-1.13",
+  "state": "I was charged twice for order #4411.",
+  "questions": {
+    "support_team": {
+      "type": "choice",
+      "instructions": "Which team should handle this customer support ticket?",
+      "criteria": {"billing": null, "shipping": null, "technical": null}
+    }
+  }
+}
+```
+
+| decision | sent | answer used |
+| --- | --- | --- |
+| `choice` | options as `criteria` keys, descriptions `null`, in the order shown | `probabilities` by option; `choice` must be the most probable option |
+| `noul` | no labels (a yes/no question) | `noul` is the probability of the first (positive) contract label; the second gets `1 − noul` |
+| `score` | levels as the ordered `criteria` list, lowest first | `probabilities` by level index (`"0"` = lowest); `legend`, when present, must echo the levels sent |
+
+Put guidance for the options into `description` or `instructions`. During fuzzing, options
+and levels are sent in the order and form shown and mapped back to the contract labels,
+as with `http`. A noul question has no labels, so `option_order` and `label_format` send the
+same request for it.
+
+Answers are checked, never repaired: the response must answer exactly this question with the
+same type, and a missing or malformed answer is an `invalid_response` for that case. The
+provider's `confidence` field measures something else, so DecGuard ignores it: its
+confidence is the selected label's probability, as for every backend. Per result, DecGuard
+records the model that answered as `model_version` (for Jev the dated snapshot, e.g.
+`typesafe/jev-1.13-20260917`) and adds `request_id`, `upstream_provider` (OpenRouter's
+`provider`) and `usage` (`input_tokens`, `output_tokens`, `cost`) to `metadata`. The
+report's backend lists the `served_models` and `upstream_providers` seen during the run.
+
+Jev returns probabilities rounded to two decimals, so K options can sum to 1 ± K × 0.005.
+Set `evaluation.probability_tolerance` to cover that (0.02 for up to four options); the sum
+is still checked and never rescaled. Kev rounds to four decimals.
+
 ## `http`
 
-For System-One/Jev-style endpoints and anything that can speak a small JSON protocol.
+For endpoints that speak DecGuard's own small JSON protocol.
 
 ```yaml
 backend:
@@ -162,18 +243,70 @@ Then `provider: openjev` works in any contract. Built-in provider names cannot b
 shadowed by plugins. Backends are called from several threads at once (up to
 `evaluation.max_concurrency`), so `predict` must be thread-safe.
 
-## Opt-in real-backend validation
+## Real-backend validation
 
-The release suite includes an opt-in test that must call a real, non-`mock` backend and
-produce at least one valid decision:
+Two opt-in test groups run genuine inference through the `systemone` backend on the
+contracts in `tests/integration/real/` (one choice, one noul and one score case each). Nothing
+is mocked. A default `pytest` run skips them. Selected with `-m`, they fail rather than skip
+when the server, checkpoint or credential is missing.
+
+### Kev (`-m real_kev`)
+
+Upstream Kev, pinned to commit `09ff745d52a0f23954e3b0f5a608bf4c7c6aebb4`, serving Kev-0.8B,
+the smallest current checkpoint (a LoRA adapter and pointer head on
+`Qwen/Qwen3.5-0.8B-Base`), at Hub revision `9a45d25eb2ab761841196625383fa1dff0e56c1e`. Kev
+needs Python 3.12 or 3.13 and `uv`. It runs on CPU (fp32) without a GPU, and on MLX (bf16)
+on Apple Silicon. The first start downloads about 1.8 GB of weights.
+
+```bash
+git clone https://github.com/jaredpalmer/kev.git && cd kev
+git checkout 09ff745d52a0f23954e3b0f5a608bf4c7c6aebb4
+uv sync --locked --extra serve
+uv run --locked --extra serve python -m kev.serve \
+  --run jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e --port 8009
+```
+
+Then, in the DecGuard checkout, once `curl -s 127.0.0.1:8009/v1/models` answers:
+
+```bash
+DECGUARD_KEV_RUN=jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e \
+  uv run pytest -m real_kev
+```
+
+`DECGUARD_KEV_RUN` is optional: when set, the test fails unless the server's
+`GET /v1/models` reports that checkpoint. The Kev server needs no credential (set
+`KEV_API_KEY` on the server and `bearer_token_env` in the contract to require one).
+
+### Jev through OpenRouter (`-m real_jev`)
+
+`typesafe/jev-1.13` through OpenRouter's Decisions API
+(`POST https://openrouter.ai/api/alpha/decisions`). The only credential is an OpenRouter API
+key in the environment:
+
+```bash
+export OPENROUTER_API_KEY=...        # never commit it or put it in a contract
+uv run pytest -m real_jev
+```
+
+This makes three billed Jev calls (about $0.00004 in total at the current price) and one
+call with a deliberately invalid key, which OpenRouter rejects with HTTP 401 and does not
+bill. The tests check that neither key appears in any output, error or report.
+
+### GitHub Actions
+
+`.github/workflows/real-backends.yml` runs both groups on `ubuntu-latest` and `macos-latest`
+with Python 3.13, as four jobs: `REAL KEV` and `REAL JEV` on each OS. It never runs on
+ordinary commits. Start it from the Actions tab (`workflow_dispatch`), or add the
+`real-backends` label to a pull request from this repository. It needs the repository secret
+`OPENROUTER_API_KEY`, which only the Jev test step receives. The Kev weights are cached by
+pinned revision. The JSON reports, Kev's model card and server log are kept as artifacts.
+
+### Any other backend (`-m external`)
 
 ```bash
 DECGUARD_EXTERNAL_CONTRACT=/absolute/path/to/real-decguard.yaml \
   uv run pytest -m external
 ```
 
-The contract must reference a reachable endpoint implementing `decguard.http/0.1` (or an
-installed backend plugin), include a real dataset, and name credentials only through
-environment variables. TypeSafe/Kev-style `POST /v1/systemone` servers use a different
-`state`/`questions`/`answers` wire format and therefore require a separately operated
-adapter or proxy; pointing the built-in `http` backend directly at one is not compatible.
+This runs `decguard test` on your own contract and requires a non-`mock` backend with at
+least one valid decision.
