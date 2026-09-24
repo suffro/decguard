@@ -7,7 +7,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    ModelWrapValidatorHandler,
+    ValidationInfo,
+    model_validator,
+)
 
 from decguard.decisions.types import DecisionSpec, DecisionType
 from decguard.errors import InvalidResponse
@@ -15,6 +21,8 @@ from decguard.errors import InvalidResponse
 DecisionInput = str | dict[str, Any]
 
 DEFAULT_PROBABILITY_TOLERANCE = 1e-3
+TOLERANCE_CONTEXT_KEY = "probability_tolerance"
+"""Validation-context key carrying the contract's ``evaluation.probability_tolerance``."""
 
 
 class DecisionRequest(BaseModel):
@@ -42,6 +50,11 @@ class DecisionResult(BaseModel):
 
     ``probabilities`` follows the contract's canonical label order. ``selected`` is the
     most probable label; ties go to the label that comes first in that order.
+
+    These invariants are enforced on every validation, including when a stored report is
+    loaded, so a tampered or corrupted result cannot pass. The allowed deviation of the
+    probability sum from 1 is read from the validation context
+    (``TOLERANCE_CONTEXT_KEY``), defaulting to ``DEFAULT_PROBABILITY_TOLERANCE``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -59,6 +72,52 @@ class DecisionResult(BaseModel):
     model_version: str | None = None
     latency_ms: float
     metadata: dict[str, Any] = {}
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _check_invariants(
+        cls, value: Any, handler: ModelWrapValidatorHandler[DecisionResult], info: ValidationInfo
+    ) -> DecisionResult:
+        if isinstance(value, cls):
+            return value  # frozen, and already checked (with its own tolerance) when built
+        result = handler(value)
+        context = info.context if isinstance(info.context, Mapping) else {}
+        result._check(context.get(TOLERANCE_CONTEXT_KEY, DEFAULT_PROBABILITY_TOLERANCE))
+        return result
+
+    def _check(self, tolerance: float) -> None:
+        if not self.labels:
+            raise ValueError("labels must not be empty")
+        if len(set(self.labels)) != len(self.labels):
+            raise ValueError(f"labels contain duplicates: {list(self.labels)}")
+        if list(self.probabilities) != list(self.labels):
+            raise ValueError(
+                f"probabilities must list exactly the labels {list(self.labels)} in that "
+                f"order, got {list(self.probabilities)}"
+            )
+        try:
+            validate_probabilities(self.labels, self.probabilities, tolerance=tolerance)
+        except InvalidResponse as exc:
+            raise ValueError(str(exc)) from exc
+        expected = select_label(self.labels, self.probabilities)
+        if self.selected != expected:
+            raise ValueError(
+                f"selected {self.selected!r} is not the most probable label {expected!r}"
+            )
+        if self.confidence != self.probabilities[expected]:
+            raise ValueError(
+                f"confidence {self.confidence!r} does not equal the probability of "
+                f"{expected!r} ({self.probabilities[expected]!r})"
+            )
+
+
+def select_label(labels: tuple[str, ...], probabilities: Mapping[str, float]) -> str:
+    """The most probable label; ties go to the label listed first."""
+    selected = labels[0]
+    for label in labels:
+        if probabilities[label] > probabilities[selected]:
+            selected = label
+    return selected
 
 
 def validate_probabilities(
@@ -116,22 +175,22 @@ def build_result(
     probabilities = validate_probabilities(
         request.decision.labels, prediction.probabilities, tolerance=tolerance
     )
-    selected = request.decision.labels[0]
-    for label in request.decision.labels:
-        if probabilities[label] > probabilities[selected]:
-            selected = label
-    return DecisionResult(
-        case_id=request.case_id,
-        decision=request.decision.name,
-        decision_type=request.decision.type,
-        labels=request.decision.labels,
-        probabilities=probabilities,
-        selected=selected,
-        confidence=probabilities[selected],
-        backend=backend,
-        provider=provider,
-        model=prediction.model or model,
-        model_version=prediction.model_version,
-        latency_ms=latency_ms,
-        metadata=dict(prediction.metadata),
+    selected = select_label(request.decision.labels, probabilities)
+    return DecisionResult.model_validate(
+        {
+            "case_id": request.case_id,
+            "decision": request.decision.name,
+            "decision_type": request.decision.type,
+            "labels": request.decision.labels,
+            "probabilities": probabilities,
+            "selected": selected,
+            "confidence": probabilities[selected],
+            "backend": backend,
+            "provider": provider,
+            "model": prediction.model or model,
+            "model_version": prediction.model_version,
+            "latency_ms": latency_ms,
+            "metadata": dict(prediction.metadata),
+        },
+        context={TOLERANCE_CONTEXT_KEY: tolerance},
     )

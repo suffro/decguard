@@ -19,6 +19,12 @@ data.
 | `failures` | failing examples (errors and wrong answers) with their inputs |
 | `results` | every case: input, expected, metadata, and a `result` or an `error` |
 
+Loading a report re-checks every stored result: probabilities over exactly the contract
+labels, in canonical order, summing to 1 within the recorded `probability_tolerance`;
+`selected` equal to the argmax (ties to the first label) and `confidence` equal to its
+probability; and exactly one of `result` or `error` per case. A tampered or corrupted
+report is rejected with exit code 2.
+
 Because `results` holds every normalized decision, `decguard report <file> --contract
 <contract>` can recompute metrics and re-apply gates offline; recomputation from the same
 results is bit-identical.

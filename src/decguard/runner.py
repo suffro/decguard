@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from decguard.backends.base import DecisionBackend
 from decguard.datasets import Case
@@ -39,6 +39,16 @@ class CaseRecord(BaseModel):
     metadata: dict[str, Any] = {}
     result: DecisionResult | None = None
     error: CaseError | None = None
+
+    @model_validator(mode="after")
+    def _result_xor_error(self) -> CaseRecord:
+        if (self.result is None) == (self.error is None):
+            raise ValueError("a case record must have exactly one of 'result' or 'error'")
+        if self.result is not None and self.result.case_id != self.case_id:
+            raise ValueError(
+                f"result.case_id {self.result.case_id!r} does not match case_id {self.case_id!r}"
+            )
+        return self
 
 
 def _run_one(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +15,12 @@ from decguard._validation import format_validation_error
 from decguard.backends.base import BackendMetadata, HealthStatus
 from decguard.contracts.loader import LoadedContract
 from decguard.contracts.models import Evaluation
-from decguard.decisions import DecisionInput, DecisionType
+from decguard.decisions import (
+    DEFAULT_PROBABILITY_TOLERANCE,
+    TOLERANCE_CONTEXT_KEY,
+    DecisionInput,
+    DecisionType,
+)
 from decguard.errors import ReportError
 from decguard.metrics import Metrics, compute_metrics
 from decguard.reports.gates import Check, Status, evaluate_gates
@@ -170,6 +176,21 @@ def write_report(report: Report, path: str | Path) -> None:
         raise ReportError(f"{path}: cannot write report: {exc.strerror or exc}") from exc
 
 
+def _stored_tolerance(text: str) -> float:
+    """The probability tolerance the report was produced with, used to re-check results.
+
+    Falls back to the default when absent or malformed; ``Evaluation`` validation then
+    reports the malformed value itself.
+    """
+    try:
+        value = json.loads(text)["evaluation"]["probability_tolerance"]
+    except (ValueError, TypeError, KeyError):
+        return DEFAULT_PROBABILITY_TOLERANCE
+    if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value <= 0.1:
+        return DEFAULT_PROBABILITY_TOLERANCE
+    return float(value)
+
+
 def load_report(path: str | Path) -> Report:
     path = Path(path)
     try:
@@ -177,7 +198,9 @@ def load_report(path: str | Path) -> Report:
     except (OSError, UnicodeDecodeError) as exc:
         raise ReportError(f"{path}: cannot read report: {exc}") from exc
     try:
-        return Report.model_validate_json(text)
+        return Report.model_validate_json(
+            text, context={TOLERANCE_CONTEXT_KEY: _stored_tolerance(text)}
+        )
     except ValidationError as exc:
         raise ReportError(
             f"{path}: not a DecGuard {REPORT_VERSION} report:\n" + format_validation_error(exc)

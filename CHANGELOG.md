@@ -23,6 +23,9 @@ versioned separately.
   reliability bins, coverage/abstention/selective accuracy, error counts, latency
   percentiles.
 - Requirement (fail) and warning gates; canonical JSON report and terminal rendering.
+  Stored reports are re-validated on load: each result must be a valid distribution
+  (within the recorded tolerance) whose `selected`/`confidence` match the argmax, and each
+  case must hold exactly one of `result` or `error`.
 - CLI: `decguard validate`, `decguard test`, `decguard report` (with re-evaluation against
   an edited contract). Exit codes: 0 pass/warn, 1 gate failed, 2 configuration/runtime
   error.
