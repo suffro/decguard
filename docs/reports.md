@@ -36,7 +36,8 @@ limits and levels to the stored transformed cases (transformations are not regen
 
 `decguard diff` writes a separate diff report (`diff_version` 0.1, see
 [regression.md](regression.md)); `decguard replay --format json` a replay report
-(`replay_version` 0.1, see [properties.md](properties.md)).
+(`replay_version` 0.1, see [properties.md](properties.md)); and `decguard check` a
+post-deployment report (`check_version` 0.1, see [production.md](production.md)).
 
 ## Metrics
 

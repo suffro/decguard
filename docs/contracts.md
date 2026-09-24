@@ -16,6 +16,8 @@ warnings: {...}            # optional soft gates
 properties: {...}          # optional metamorphic properties (decguard fuzz / test --all)
 fuzz: {...}                # optional fuzz settings: seed, text_field, minimization
 regression: {...}          # optional regression gates (decguard diff)
+production: {...}          # optional post-deployment gates and metadata segments
+policy: {...}              # optional ordered runtime routes
 ```
 
 ## `decision`
@@ -110,3 +112,14 @@ paraphrase, noul inversion, score monotonicity) and their tolerances. See
 
 Limits on how much a candidate run may degrade relative to a baseline, applied by
 `decguard diff`. See [regression.md](regression.md).
+
+## `production`
+
+Offline aggregate, baseline-drift and per-segment gates applied by `decguard check`.
+Production data is separate from the golden `dataset`. See [production.md](production.md)
+for its JSONL schema, metrics and gate reference.
+
+## `policy`
+
+An ordered, deterministic route table over decision confidence with `accept`, `abstain`,
+`fallback` and `human_review` actions. See [policy.md](policy.md).

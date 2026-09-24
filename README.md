@@ -7,10 +7,9 @@ DecGuard sits above your decision backends. You describe the decision once in a 
 **contract**, run a dataset through any backend, and get one reproducible **reliability
 report** with CI-friendly PASS / WARN / FAIL gates.
 
-> Status: pre-release (`0.1.0.dev0`). Steps 1 and 2 of the v0.1 plan are implemented:
-> contracts, backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
-> regression diffs and failure replay. Post-deployment checks and fallback policies come
-> next.
+> Status: pre-release (`0.1.0.dev0`). The v0.1 plan is implemented: contracts, backends,
+> golden-dataset testing, metrics, reports, metamorphic fuzzing, regression/replay,
+> offline post-deployment checks, explicit cascade policies and a minimal Python SDK.
 
 ## 5-minute quickstart
 
@@ -90,6 +89,26 @@ FAIL: at least one requirement does not hold
 `decguard replay fuzz.json` re-sends the stored failures; `decguard diff baseline.json
 candidate.json --contract decguard.yaml` compares two runs for regressions.
 
+### Check production records and route runtime decisions
+
+Analyze records your application collected—fully offline—and gate aggregate, drift and
+metadata-segment reliability:
+
+```bash
+decguard check examples/refund/decguard.yaml \
+  --dataset examples/refund/production.jsonl \
+  --output production-report.json
+```
+
+The same contract can deterministically route one normalized decision:
+
+```bash
+decguard run examples/refund/decguard.yaml "The blender arrived damaged"
+```
+
+See [post-deployment checks](docs/production.md) and the
+[policy/SDK guide](docs/policy.md).
+
 ## Commands
 
 | Command | What it does |
@@ -101,6 +120,8 @@ candidate.json --contract decguard.yaml` compares two runs for regressions.
 | `decguard replay <report.json>` | Re-send stored property failures (`--id` for one); exit 1 if they still fail. |
 | `decguard diff <baseline.json> <candidate.json>` | Answer flips, confidence/distribution shifts, calibration, latency, error and per-segment changes; `--contract` applies `regression` gates. |
 | `decguard report <report.json>` | Show a stored report; `--contract` re-applies (possibly edited) gates without re-running the model. |
+| `decguard check <contract> --dataset <records>` | Analyze production JSONL/JSON offline, optionally against `--baseline`, with aggregate and segment gates. |
+| `decguard run <contract> <input>` | Make one decision and apply the contract's ordered policy. |
 
 Exit codes: **0** pass (or warn; `--fail-on-warn` turns warn into 1), **1** a reliability
 gate failed, **2** configuration or runtime error. Use `--format json` for machine-readable
@@ -125,6 +146,9 @@ A full workflow with a regression diff is in [docs/ci.md](docs/ci.md).
 - [Reports, metrics and gates](docs/reports.md)
 - [Metamorphic properties, fuzzing and replay](docs/properties.md)
 - [Regression diffs](docs/regression.md)
+- [Post-deployment checks and record format](docs/production.md)
+- [Runtime cascade policy and Python SDK](docs/policy.md)
+- [Architecture and integration philosophy](docs/architecture.md)
 - [CI with GitHub Actions](docs/ci.md)
 - [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 

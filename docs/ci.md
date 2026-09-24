@@ -30,6 +30,14 @@ jobs:
           decguard test decguard.yaml --backend production --output baseline.json
           decguard diff baseline.json candidate.json --contract decguard.yaml --output diff.json
 
+      - name: Post-deployment batch gate
+        if: always()
+        run: |
+          decguard check decguard.yaml \
+            --dataset collected-production.jsonl \
+            --baseline previous-production-report.json \
+            --output production-report.json
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -38,6 +46,7 @@ jobs:
             candidate.json
             baseline.json
             diff.json
+            production-report.json
 ```
 
 - Pin a `fuzz.seed` in the contract (or pass `--seed`) so every CI run checks the same
@@ -45,3 +54,5 @@ jobs:
 - Keep the JSON reports as artifacts. A failure can then be reproduced locally with
   `decguard replay candidate.json`.
 - `--fail-on-warn` turns warning gates into failures, for a stricter main branch.
+- `decguard check` is offline: schedule the same command in cron or Actions after your own
+  collection/export job. DecGuard does not ingest telemetry or need service credentials.

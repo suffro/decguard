@@ -58,6 +58,13 @@ versioned separately.
   - contract `regression` gates, with an implicit `max_error_rate_increase: 0`.
 - Mock backend: `position_bias`, a deliberate order-sensitivity defect for demos. The
   mock also understands reordered and reformatted options.
+- Backend-neutral production JSONL/JSON records and `decguard check`: offline accuracy,
+  error/calibration, threshold coverage, routing, confidence, latency and cost summaries;
+  drift against a prior dataset/report; metadata segments with independent gates; and a
+  versioned, integrity-checked production report.
+- Explicit deterministic `policy` routes for `accept`, `abstain`, named-backend `fallback`
+  and `human_review`, exposed by `decguard run` and the embeddable `DecGuard` Python API.
+  Fallback is a directive and is never invoked or optimized implicitly.
 
 ### Changed
 

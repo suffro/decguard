@@ -8,8 +8,8 @@ reliability report with PASS / WARN / FAIL gates. It is backend-neutral: models 
 reached through thin adapters that all normalize into the same `DecisionResult`.
 
 The v0.1 plan is `state/DECGUARD_V0.1_CODEX_PLAN.md`. Steps 1 (core, contracts, backends,
-CLI) and 2 (metamorphic fuzzing, regression diff, replay) are implemented; post-deploy
-checks and policies are not yet.
+CLI), 2 (metamorphic fuzzing, regression diff, replay) and 3 (offline production checks,
+explicit policies and SDK) are implemented.
 
 ## Major components
 
@@ -36,12 +36,18 @@ checks and policies are not yet.
   (`Comparison`, `judge`), `engine.py` (`PropertyRunner`: plan, execute, map shown labels
   back, compare, minimize), `replay.py` (re-send stored failures, regeneration check).
 - `regression/diff.py`: `diff_reports` on matched case ids, `DiffReport`, regression gates.
+- `production/`: strict production JSONL/JSON records, metrics, confidence/calibration drift,
+  metadata segments, gates and the versioned `ProductionReport`; no backend is called.
+- `policy/`: pure first-match evaluation of validated contract routes.
+- `sdk.py`: `DecGuard.from_contract(...).decide(...)`, sharing backend normalization and the
+  policy engine with CLI `run`.
 - `reports/`: `gates.py` (gate table, `make_check`, implicit `max_error_rate: 0`, status),
   `model.py` (`Report` JSON model with `mode` and optional `properties`, `build_report`,
   `reevaluate`, read/write), `properties.py` (transformed-case records, summaries, property
   checks, `rejudge`, load-time `verify_run`), `render.py` (terminal).
 - `engine.py`: `run_test(mode="test"|"fuzz"|"all")` orchestration shared by CLI and API.
-- `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`.
+- `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`,
+  offline `check`, and policy `run`.
 
 ## Data flow
 
@@ -53,6 +59,9 @@ Fuzz: after the golden run, each enabled property generates transformations per 
 `decide_mutation` (shown labels → backend → mapped back) → `compare`/`judge` against the
 original → minimize failures → `PropertyRun` in the same `Report`.
 Diff: two stored reports → matched cases → shifts, metric deltas, segments → gates.
+Production: collected JSONL → strict normalization → aggregate/segment metrics → optional
+dataset/report baseline drift → gates → production report. Runtime: backend result → ordered
+policy → action directive (fallback is not invoked automatically).
 
 ## External systems
 
