@@ -61,6 +61,8 @@ testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 markers = [
     "external: needs a real decision backend (opt-in, set DECGUARD_EXTERNAL_CONTRACT)",
+    "real_kev: genuine inference on a local Kev server (opt-in: -m real_kev)",
+    "real_jev: genuine Jev inference through OpenRouter (opt-in: -m real_jev)",
 ]
 filterwarnings = ["error"]
 

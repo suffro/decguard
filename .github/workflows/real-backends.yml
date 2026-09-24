@@ -1,0 +1,138 @@
+name: Real backends
+
+# Genuine inference against real System One backends: upstream Kev serving a pinned
+# checkpoint on the runner, and TypeSafe's Jev through OpenRouter. Manual only, so model
+# downloads and paid API calls never run on every commit. Once selected, the tests fail
+# (never skip) when the server, checkpoint or credential is missing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-backends-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # One Python version for DecGuard and the Kev server alike (Kev supports 3.12-3.13).
+  PYTHON_VERSION: "3.13"
+  # Upstream Kev and the smallest current checkpoint (Kev-0.8B on Qwen3.5-0.8B-Base).
+  KEV_REPOSITORY: jaredpalmer/kev
+  KEV_REF: 09ff745d52a0f23954e3b0f5a608bf4c7c6aebb4
+  KEV_RUN: jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e
+
+jobs:
+  kev:
+    name: REAL KEV (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out upstream Kev
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.KEV_REPOSITORY }}
+          ref: ${{ env.KEV_REF }}
+          path: kev-upstream
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Keep model weights outside the checkout
+        run: echo "HF_HOME=$RUNNER_TEMP/hf" >> "$GITHUB_ENV"
+      - name: Cache the pinned Kev checkpoint and base model
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/hf
+          key: kev-weights-${{ runner.os }}-${{ env.KEV_RUN }}
+      - name: Install upstream Kev
+        working-directory: kev-upstream
+        run: uv sync --locked --extra serve
+      - name: Start Kev
+        working-directory: kev-upstream
+        run: |
+          nohup uv run --locked --extra serve python -m kev.serve \
+            --run "$KEV_RUN" --port 8009 > "$RUNNER_TEMP/kev.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/kev.pid"
+      - name: Wait until Kev has loaded the checkpoint
+        run: |
+          for _ in $(seq 1 240); do
+            if curl -fsS http://127.0.0.1:8009/v1/models -o "$RUNNER_TEMP/kev-models.json"; then
+              grep -m 1 '^serving ' "$RUNNER_TEMP/kev.log" || true
+              python3 -m json.tool "$RUNNER_TEMP/kev-models.json" | head -n 20
+              exit 0
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/kev.pid")" 2> /dev/null; then
+              echo "::error::the Kev server exited"
+              tail -n 60 "$RUNNER_TEMP/kev.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::the Kev server did not answer within 20 minutes"
+          tail -n 60 "$RUNNER_TEMP/kev.log"
+          exit 1
+      - name: Install DecGuard
+        run: uv sync --locked
+      - name: REAL KEV
+        env:
+          DECGUARD_KEV_RUN: ${{ env.KEV_RUN }}
+          DECGUARD_REAL_REPORTS: ${{ runner.temp }}/reports
+        run: uv run pytest -m real_kev tests/integration/test_real_backends.py -v -s -p no:cacheprovider
+      - name: Show the reports
+        if: always()
+        run: |
+          for report in "$RUNNER_TEMP"/reports/*.json; do
+            if [ -f "$report" ]; then uv run decguard report "$report"; fi
+          done
+          tail -n 40 "$RUNNER_TEMP/kev.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-kev-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/reports/
+            ${{ runner.temp }}/kev-models.json
+            ${{ runner.temp }}/kev.log
+          if-no-files-found: warn
+
+  jev:
+    name: REAL JEV (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install DecGuard
+        run: uv sync --locked
+      # Three billed Jev calls (choice, noul, score) plus one rejected-key call (HTTP 401).
+      - name: REAL JEV
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DECGUARD_REAL_REPORTS: ${{ runner.temp }}/reports
+        run: uv run pytest -m real_jev tests/integration/test_real_backends.py -v -s -p no:cacheprovider
+      # The tests assert the key is absent from every report before keeping it.
+      - name: Show the reports
+        if: always()
+        run: |
+          for report in "$RUNNER_TEMP"/reports/*.json; do
+            if [ -f "$report" ]; then uv run decguard report "$report"; fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-jev-${{ matrix.os }}
+          path: ${{ runner.temp }}/reports/
+          if-no-files-found: warn

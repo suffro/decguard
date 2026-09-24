@@ -1,0 +1,33 @@
+# Real-backend compatibility check (pytest -m real_kev / -m real_jev; docs/backends.md).
+# The default backend is a local Kev server; `jev` is TypeSafe's Jev on OpenRouter.
+schema_version: "0.1"
+
+decision:
+  name: customer_frustration
+  type: score
+  description: How frustrated is the customer?
+  levels: [calm, frustrated, very angry]   # lowest first; sent as the ordered criteria
+
+backend:
+  provider: systemone
+  model: kev-latest
+  url: http://127.0.0.1:8009/v1/systemone
+  health_url: http://127.0.0.1:8009/v1/models
+  timeout_s: 300          # a CPU runner warms the model up on the first request
+
+backends:
+  jev:
+    provider: systemone
+    model: typesafe/jev-1.13
+    url: https://openrouter.ai/api/alpha/decisions
+    bearer_token_env: OPENROUTER_API_KEY
+    timeout_s: 60
+    max_retries: 2        # connection failures, 429, 502-504 and 529 only
+
+dataset: score.jsonl
+
+evaluation:
+  # Jev rounds probabilities to two decimals, so three of them can sum to 1 ± 0.015.
+  # The sum is checked, never rescaled.
+  probability_tolerance: 0.02
+  max_concurrency: 1

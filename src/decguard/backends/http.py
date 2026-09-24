@@ -1,4 +1,4 @@
-"""Generic HTTP backend for System-One/Jev-style decision endpoints.
+"""Generic HTTP backend for decision endpoints (System One APIs: see ``systemone.py``).
 
 Protocol ``decguard.http/0.1`` (see docs/backends.md)::
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import httpx
 from pydantic import Field, field_validator, model_validator
@@ -120,6 +120,9 @@ class HttpSettings(StrictModel):
 
 class HttpBackend(DecisionBackend):
     provider = "http"
+    protocol: ClassVar[str] = PROTOCOL
+    retryable_status: ClassVar[frozenset[int]] = _RETRYABLE_STATUS
+    """Statuses retried (up to ``max_retries``) and reported as ``unavailable``."""
 
     def __init__(
         self,
@@ -199,7 +202,7 @@ class HttpBackend(DecisionBackend):
                     f"transport error from backend {self.name!r}: {type(exc).__name__}"
                 ) from exc
             else:
-                if response.status_code not in _RETRYABLE_STATUS or last:
+                if response.status_code not in self.retryable_status or last:
                     return response
             time.sleep(self.settings.retry_backoff_s * (2**attempt))
         raise AssertionError("unreachable")  # pragma: no cover
@@ -217,20 +220,27 @@ class HttpBackend(DecisionBackend):
             },
             "input": request.input,
         }
+        return self._parse(self._post(payload))
+
+    def _post(self, payload: dict[str, Any]) -> httpx.Response:
+        """POST ``payload`` to the decision URL; any non-2xx answer becomes a case error."""
         response = self._send("POST", self.settings.url, json=payload)
-        if response.status_code in _RETRYABLE_STATUS:
+        if response.status_code in self.retryable_status:
             raise BackendUnavailable(f"backend {self.name!r} returned HTTP {response.status_code}")
         if not response.is_success:
             # Response bodies are untrusted and can echo credentials or private input.
             # Keep case errors useful without persisting arbitrary server text in reports.
             raise BackendError(f"backend {self.name!r} returned HTTP {response.status_code}")
-        return self._parse(response)
+        return response
 
-    def _parse(self, response: httpx.Response) -> Prediction:
+    def _json(self, response: httpx.Response) -> Any:
         try:
-            body = response.json()
+            return response.json()
         except ValueError as exc:
             raise InvalidResponse(f"backend {self.name!r} returned invalid JSON") from exc
+
+    def _parse(self, response: httpx.Response) -> Prediction:
+        body = self._json(response)
         if not isinstance(body, dict) or not isinstance(body.get("probabilities"), dict):
             raise InvalidResponse(f"backend {self.name!r} response has no 'probabilities' object")
         probabilities: dict[str, Any] = {}
@@ -273,7 +283,7 @@ class HttpBackend(DecisionBackend):
             name=self.name,
             provider=self.provider,
             model=self.model,
-            details={"url": _redact(self.settings.url), "protocol": PROTOCOL},
+            details={"url": _redact(self.settings.url), "protocol": self.protocol},
         )
 
     def close(self) -> None:

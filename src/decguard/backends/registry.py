@@ -12,6 +12,7 @@ from importlib.metadata import entry_points
 from decguard.backends.base import DecisionBackend
 from decguard.backends.http import HttpBackend
 from decguard.backends.mock import MockBackend
+from decguard.backends.systemone import SystemOneBackend
 from decguard.contracts.models import BackendConfig
 from decguard.decisions import DecisionSpec
 from decguard.errors import ContractError
@@ -21,6 +22,7 @@ ENTRY_POINT_GROUP = "decguard.backends"
 BUILTIN_BACKENDS: dict[str, type[DecisionBackend]] = {
     MockBackend.provider: MockBackend,
     HttpBackend.provider: HttpBackend,
+    SystemOneBackend.provider: SystemOneBackend,
 }
 
 
