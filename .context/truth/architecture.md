@@ -42,9 +42,11 @@ explicit policies and SDK) are implemented.
 - `sdk.py`: `DecGuard.from_contract(...).decide(...)`, sharing backend normalization and the
   policy engine with CLI `run`.
 - `reports/`: `gates.py` (gate table, `make_check`, implicit `max_error_rate: 0`, status),
-  `model.py` (`Report` JSON model with `mode` and optional `properties`, `build_report`,
-  `reevaluate`, read/write), `properties.py` (transformed-case records, summaries, property
-  checks, `rejudge`, load-time `verify_run`), `render.py` (terminal).
+  `model.py` (`Report` JSON model with stored gate settings, `mode` and optional
+  `properties`; complete load-time recomputation of counts, metrics, failures, summaries,
+  checks and status; build/reevaluate/read/write), `properties.py` (transformed-case
+  records, summaries, property checks, `rejudge`, load-time `verify_run`), `render.py`
+  (terminal).
 - `engine.py`: `run_test(mode="test"|"fuzz"|"all")` orchestration shared by CLI and API.
 - `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`,
   offline `check`, and policy `run`.
@@ -77,7 +79,9 @@ policy → action directive (fallback is not invoked automatically).
 - Malformed backend output and invalid dataset rows are errors, never repaired or dropped.
 - Metrics are deterministic (`math.fsum`, dataset order); the mock backend's hash output is
   pinned by a test.
-- Credentials only via environment variables; never in reports, errors or metadata.
+- Credentials only via environment variables; authenticated healthchecks stay on the
+  backend origin; common secret-like metadata keys are redacted; secrets never appear in
+  reports or HTTP error text.
 - Contracts never execute code (safe YAML, no import paths).
 - Fuzz runs are reproducible from the stored seed; transformation generation is pinned by
   tests (see `decisions/metamorphic-engine-design.md`).

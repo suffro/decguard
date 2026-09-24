@@ -12,9 +12,11 @@ from pydantic import (
     ConfigDict,
     ModelWrapValidatorHandler,
     ValidationInfo,
+    field_validator,
     model_validator,
 )
 
+from decguard._validation import redact_sensitive_values
 from decguard.decisions.types import DecisionSpec, DecisionType
 from decguard.errors import InvalidResponse
 
@@ -72,6 +74,8 @@ class DecisionResult(BaseModel):
     model_version: str | None = None
     latency_ms: float
     metadata: dict[str, Any] = {}
+
+    _redact_metadata = field_validator("metadata", mode="before")(redact_sensitive_values)
 
     @model_validator(mode="wrap")
     @classmethod

@@ -8,6 +8,8 @@ versioned separately.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-24
+
 ### Added
 
 - Decision Contract schema `0.1` for `choice`, `noul` (boolean) and `score` (ordered)
@@ -23,9 +25,9 @@ versioned separately.
   reliability bins, coverage/abstention/selective accuracy, error counts, latency
   percentiles.
 - Requirement (fail) and warning gates; canonical JSON report and terminal rendering.
-  Stored reports are re-validated on load: each result must be a valid distribution
-  (within the recorded tolerance) whose `selected`/`confidence` match the argmax, and each
-  case must hold exactly one of `result` or `error`.
+  Stored reports are re-validated on load: results, dataset counts, metrics, failures,
+  property summaries, checks, status and exit code must all agree; each case holds exactly
+  one valid result or error.
 - CLI: `decguard validate`, `decguard test`, `decguard report` (with re-evaluation against
   an edited contract). Exit codes: 0 pass/warn, 1 gate failed, 2 configuration/runtime
   error.
@@ -72,4 +74,9 @@ versioned separately.
   only when the backend returns the same stable error kind.
 - Mock rules match ignoring whitespace differences as well as case.
 - Examples declare properties; `severity` uses object inputs (`text`, `affected_users`).
-  The refund example's `max_ece` is 0.2.
+  The refund demo includes strict calibration/distribution-regression gates and a
+  production-drift fixture.
+- HTTP backend errors no longer include untrusted response bodies, preventing reflected
+  secrets or private input from being persisted in reports. Credential-like URL query
+  parameters are rejected, authenticated healthchecks stay on the backend origin, and
+  common secret keys in result/backend metadata are redacted recursively.

@@ -7,20 +7,22 @@ DecGuard sits above your decision backends. You describe the decision once in a 
 **contract**, run a dataset through any backend, and get one reproducible **reliability
 report** with CI-friendly PASS / WARN / FAIL gates.
 
-> Status: pre-release (`0.1.0.dev0`). The v0.1 plan is implemented: contracts, backends,
-> golden-dataset testing, metrics, reports, metamorphic fuzzing, regression/replay,
-> offline post-deployment checks, explicit cascade policies and a minimal Python SDK.
+> Status: v0.1 release candidate (`0.1.0`), not yet tagged or published. Contracts,
+> backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
+> regression/replay, offline post-deployment checks, explicit cascade policies and the
+> Python SDK are implemented.
 
 ## 5-minute quickstart
 
 ```bash
 git clone https://github.com/suffro/decguard && cd decguard
-uv tool install .            # or: pip install .
-decguard test examples/refund/decguard.yaml
+uv tool install .            # or, in a virtualenv: pip install .
+decguard validate examples/refund/decguard.yaml
+decguard test examples/refund/decguard.yaml --all --output stable.json
 ```
 
 ```text
-DecGuard 0.1.0.dev0 · refund_request (choice) · PASS
+DecGuard 0.1.0 · refund_request (choice) · PASS
 
   Cases        11 total · 11 decided · 0 errored · 10 labeled
   Accuracy     1.000   macro-F1 1.000
@@ -29,7 +31,7 @@ DecGuard 0.1.0.dev0 · refund_request (choice) · PASS
   ...
   Checks
     PASS  min_accuracy                           accuracy 1 >= 0.9
-    PASS  max_ece                                ece 0.139 <= 0.2
+    PASS  max_ece                                ece 0.139 <= 0.15
     ...
 PASS: all gates hold
 ```
@@ -66,10 +68,11 @@ warnings:                     # soft gates -> WARN
 ### Find what golden tests miss
 
 The refund example also defines `order_sensitive`, a backend that quietly favours whichever
-option is listed first. Its golden results pass. The metamorphic properties catch it:
+option is listed first. Its ordinary accuracy still looks perfect, but calibration and the
+metamorphic properties catch it:
 
 ```bash
-decguard test examples/refund/decguard.yaml -b order_sensitive       # PASS
+decguard test examples/refund/decguard.yaml -b order_sensitive       # calibration FAIL
 decguard fuzz examples/refund/decguard.yaml -b order_sensitive -o fuzz.json
 ```
 
@@ -86,8 +89,15 @@ decguard fuzz examples/refund/decguard.yaml -b order_sensitive -o fuzz.json
 FAIL: at least one requirement does not hold
 ```
 
-`decguard replay fuzz.json` re-sends the stored failures; `decguard diff baseline.json
-candidate.json --contract decguard.yaml` compares two runs for regressions.
+The broken run exits `1`, records the distribution drift and stores minimal failing
+examples. Replay it, then show that the same backend also breaks calibration and the
+regression limit:
+
+```bash
+decguard replay fuzz.json                                           # reproduces; exit 1
+decguard test examples/refund/decguard.yaml -b order_sensitive -o candidate.json
+decguard diff stable.json candidate.json -c examples/refund/decguard.yaml
+```
 
 ### Check production records and route runtime decisions
 
@@ -100,11 +110,25 @@ decguard check examples/refund/decguard.yaml \
   --output production-report.json
 ```
 
+Compare an intentionally overconfident, incorrect batch to see calibration drift and
+localized segment failures (exit `1`):
+
+```bash
+decguard check examples/refund/decguard.yaml \
+  --dataset examples/refund/production-drift.jsonl \
+  --baseline examples/refund/production.jsonl
+```
+
 The same contract can deterministically route one normalized decision:
 
 ```bash
 decguard run examples/refund/decguard.yaml "The blender arrived damaged"
+decguard run examples/refund/decguard.yaml "The parcel never arrived"
+decguard run examples/refund/decguard.yaml "Can someone call me?"
 ```
+
+These three calls deterministically return `accept`, a `fallback -> strong_model`
+directive, and `human_review`. The fallback is not invoked automatically.
 
 See [post-deployment checks](docs/production.md) and the
 [policy/SDK guide](docs/policy.md).

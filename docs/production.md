@@ -56,6 +56,8 @@ are `decision`, `probabilities` and `selected`. `id` defaults to `record-<n>` an
 
 The complete runnable sample is
 [`examples/refund/production.jsonl`](../examples/refund/production.jsonl).
+An intentionally overconfident and incorrect comparison batch is
+[`examples/refund/production-drift.jsonl`](../examples/refund/production-drift.jsonl).
 
 ## Metrics, drift and gates
 

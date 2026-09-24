@@ -328,8 +328,15 @@ def verify_run(run: PropertyRun, records: Mapping[str, CaseRecord]) -> None:
     """Raise ValueError when a stored transformed case is inconsistent with its original
     or with the recorded property settings (tampered or corrupted report)."""
     enabled = run.config.configured()
+    seen: set[str] = set()
     for index, pair in enumerate(run.pairs):
         where = f"properties.pairs.{index} ({pair.id})"
+        expected_id = f"{pair.property}/{pair.case_id}/{pair.sample}"
+        if pair.id != expected_id:
+            raise ValueError(f"{where}: id must be {expected_id!r}")
+        if pair.id in seen:
+            raise ValueError(f"{where}: duplicate transformed case id {pair.id!r}")
+        seen.add(pair.id)
         prop = enabled.get(pair.property)
         if prop is None:
             raise ValueError(f"{where}: property {pair.property!r} is not in properties.config")
@@ -355,3 +362,9 @@ def verify_run(run: PropertyRun, records: Mapping[str, CaseRecord]) -> None:
                 raise ValueError(f"{where}: reduced example does not match its result")
             if pair.reduced.result.case_id != pair.id:
                 raise ValueError(f"{where}: reduced result.case_id does not match id")
+    for index, skip in enumerate(run.skipped):
+        where = f"properties.skipped.{index}"
+        if skip.property not in enabled:
+            raise ValueError(f"{where}: property {skip.property!r} is not in properties.config")
+        if skip.case_id not in records:
+            raise ValueError(f"{where}: case {skip.case_id!r} is not in results")

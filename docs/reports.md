@@ -14,7 +14,7 @@ data.
 | `contract` | name, type, labels, schema version, `sha256:` hash, path |
 | `dataset` | path, `sha256:` hash of the file bytes, case and labeled counts |
 | `backend`, `health` | backend name, provider, model, version, redacted details; healthcheck result |
-| `evaluation` | the evaluation settings used |
+| `evaluation`, `requirements`, `warnings` | the evaluation and gate settings used |
 | `metrics` | `counts`, `classification`, `calibration`, `selective`, `latency` |
 | `checks` | one entry per gate: level, metric, comparison, threshold, value, status |
 | `failures` | failing examples (errors and wrong answers) with their inputs |
@@ -26,8 +26,9 @@ labels, in canonical order, summing to 1 within the recorded `probability_tolera
 `selected` equal to the argmax (ties to the first label) and `confidence` equal to its
 probability; and exactly one of `result` or `error` per case. Transformed cases are
 checked the same way. Their comparison and violations must also match what their stored
-results and the recorded property settings imply. A tampered or corrupted report is
-rejected with exit code 2.
+results and the recorded property settings imply. Dataset counts, aggregate metrics,
+failure examples, property summaries, checks, status and exit code are recomputed and
+must agree. A tampered or corrupted report is rejected with exit code 2.
 
 Because `results` holds every normalized decision, `decguard report <file> --contract
 <contract>` can recompute metrics and re-apply gates offline; recomputation from the same

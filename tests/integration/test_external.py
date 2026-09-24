@@ -31,4 +31,5 @@ def test_real_backend_produces_a_valid_report(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["test", str(CONTRACT), "--output", str(output)])
     assert result.exit_code in (0, 1), result.stdout + result.stderr
     report = Report.model_validate(json.loads(output.read_text()))
+    assert report.backend.provider != "mock", "external validation must use a real backend"
     assert report.metrics.counts.succeeded > 0

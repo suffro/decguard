@@ -483,10 +483,18 @@ def test_fuzz_report_round_trips_and_detects_tampering(
     def drop_mode(data: dict[str, Any]) -> None:
         data["mode"] = "test"
 
+    def alter_summary(data: dict[str, Any]) -> None:
+        data["properties"]["summaries"][0]["n_violations"] = 0
+
+    def drop_check(data: dict[str, Any]) -> None:
+        data["checks"].pop()
+
     for edit, message in [
         (hide_violation, "violations do not match the property settings"),
         (shrink_distance, "comparison does not match the stored results"),
         (drop_mode, "'properties' must be present exactly in 'fuzz' and 'all' reports"),
+        (alter_summary, "property summaries do not match stored transformed cases"),
+        (drop_check, "checks do not match stored metrics and configuration"),
     ]:
         with pytest.raises(ReportError, match=re.escape(message)):
             load_report(tampered(edit))

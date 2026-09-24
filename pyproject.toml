@@ -1,6 +1,6 @@
 [project]
 name = "decguard"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Test, verify and gate probabilistic AI decision models across interchangeable backends."
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,7 +30,9 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/suffro/decguard"
+Documentation = "https://github.com/suffro/decguard#readme"
 Changelog = "https://github.com/suffro/decguard/blob/main/CHANGELOG.md"
+Issues = "https://github.com/suffro/decguard/issues"
 
 [project.scripts]
 decguard = "decguard.cli:main"
@@ -52,6 +54,7 @@ packages = ["src/decguard"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/decguard", "tests", "docs", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+exclude = [".context"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

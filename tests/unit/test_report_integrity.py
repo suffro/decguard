@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections.abc import Callable
@@ -134,6 +135,21 @@ def _neither(data: dict[str, Any]) -> None:
     data["results"][0]["result"] = None
 
 
+def _wrong_metrics(data: dict[str, Any]) -> None:
+    data["metrics"]["classification"]["accuracy"] = 0.0
+
+
+def _wrong_status(data: dict[str, Any]) -> None:
+    data["status"] = "fail"
+    data["exit_code"] = 1
+
+
+def _duplicate_case(data: dict[str, Any]) -> None:
+    data["results"].append(copy.deepcopy(data["results"][0]))
+    data["dataset"]["n_cases"] += 1
+    data["dataset"]["n_labeled"] += int(data["results"][0]["expected"] is not None)
+
+
 @pytest.mark.parametrize(
     ("edit", "message"),
     [
@@ -142,6 +158,9 @@ def _neither(data: dict[str, Any]) -> None:
         (_wrong_confidence, "results.0.result: confidence 0.99 does not equal"),
         (_both, "results.0: a case record must have exactly one of 'result' or 'error'"),
         (_neither, "results.0: a case record must have exactly one of 'result' or 'error'"),
+        (_wrong_metrics, "metrics do not match stored case results"),
+        (_wrong_status, "status/exit_code do not match stored checks"),
+        (_duplicate_case, "duplicate case id"),
     ],
 )
 def test_tampered_reports_are_rejected(

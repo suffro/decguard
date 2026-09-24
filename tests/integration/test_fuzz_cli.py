@@ -93,8 +93,11 @@ def test_fuzz_fails_ci_on_a_property_violation(refund: Path, tmp_path: Path) -> 
     failing = [p for p in report["properties"]["pairs"] if p["violations"]]
     assert failing
     assert all(p["property"] == "option_order" for p in failing)
-    # `test` without --all ignores properties: the golden gates still pass.
-    assert invoke("test", refund, "-b", "order_sensitive")[0] == 0
+    # `test` without --all ignores properties, but the same flawed backend also violates
+    # the demo's stricter calibration gate.
+    code, golden, _ = invoke("test", refund, "-b", "order_sensitive")
+    assert code == 1
+    assert "FAIL  max_ece" in golden
     assert invoke("test", refund, "-b", "order_sensitive", "--all")[0] == 1
 
 
