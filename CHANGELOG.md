@@ -8,6 +8,14 @@ versioned separately.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-25
+
+### Fixed
+
+- The README, which is also the PyPI project page, installs with `pip install decguard` /
+  `uv tool install decguard` instead of cloning the repository, and its links point to
+  GitHub so they work on PyPI. The CI examples install from PyPI.
+
 ## [0.1.0] - 2026-09-24
 
 ### Added

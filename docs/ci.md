@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv tool install git+https://github.com/suffro/decguard
+      - run: uv tool install decguard
 
       - name: Validate the contract (offline)
         run: decguard validate decguard.yaml

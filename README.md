@@ -7,23 +7,31 @@ DecGuard sits above your decision backends. You describe the decision once in a 
 **contract**, run a dataset through any backend, and get one reproducible **reliability
 report** with CI-friendly PASS / WARN / FAIL gates.
 
-> Status: v0.1 release candidate (`0.1.0`), not yet tagged or published. Contracts,
-> backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
+> Status: alpha (v0.1). Contracts, backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
 > regression/replay, offline post-deployment checks, explicit cascade policies and the
 > Python SDK are implemented. The `systemone` backend is validated end to end against a
 > real Kev-0.8B server and real Jev through OpenRouter, on Linux and macOS.
 
-## 5-minute quickstart
+## Install
 
 ```bash
-git clone https://github.com/suffro/decguard && cd decguard
-uv tool install .            # or, in a virtualenv: pip install .
+pip install decguard         # or: uv tool install decguard
+```
+
+Python 3.11+.
+
+## 5-minute quickstart
+
+The quickstart uses the example contract and datasets from the repository:
+
+```bash
+git clone --depth 1 https://github.com/suffro/decguard && cd decguard
 decguard validate examples/refund/decguard.yaml
 decguard test examples/refund/decguard.yaml --all --output stable.json
 ```
 
 ```text
-DecGuard 0.1.0 · refund_request (choice) · PASS
+DecGuard 0.1.1 · refund_request (choice) · PASS
 
   Cases        11 total · 11 decided · 0 errored · 10 labeled
   Accuracy     1.000   macro-F1 1.000
@@ -37,7 +45,7 @@ DecGuard 0.1.0 · refund_request (choice) · PASS
 PASS: all gates hold
 ```
 
-A contract looks like this ([full reference](docs/contracts.md)):
+A contract looks like this ([full reference](https://github.com/suffro/decguard/blob/main/docs/contracts.md)):
 
 ```yaml
 schema_version: "0.1"
@@ -131,8 +139,8 @@ decguard run examples/refund/decguard.yaml "Can someone call me?"
 These three calls deterministically return `accept`, a `fallback -> strong_model`
 directive, and `human_review`. The fallback is not invoked automatically.
 
-See [post-deployment checks](docs/production.md) and the
-[policy/SDK guide](docs/policy.md).
+See [post-deployment checks](https://github.com/suffro/decguard/blob/main/docs/production.md) and the
+[policy/SDK guide](https://github.com/suffro/decguard/blob/main/docs/policy.md).
 
 ## Commands
 
@@ -155,27 +163,27 @@ output on stdout.
 ### In CI
 
 ```yaml
-- run: uv tool install git+https://github.com/suffro/decguard
+- run: uv tool install decguard
 - run: decguard test decguard.yaml --all --output decguard-report.json
 - uses: actions/upload-artifact@v4
   if: always()
   with: { name: decguard-report, path: decguard-report.json }
 ```
 
-A full workflow with a regression diff is in [docs/ci.md](docs/ci.md).
+A full workflow with a regression diff is in [docs/ci.md](https://github.com/suffro/decguard/blob/main/docs/ci.md).
 
 ## Documentation
 
-- [Decision Contract reference](docs/contracts.md)
-- [Backends: System One (Kev, Jev), HTTP, plugins](docs/backends.md)
-- [Reports, metrics and gates](docs/reports.md)
-- [Metamorphic properties, fuzzing and replay](docs/properties.md)
-- [Regression diffs](docs/regression.md)
-- [Post-deployment checks and record format](docs/production.md)
-- [Runtime cascade policy and Python SDK](docs/policy.md)
-- [Architecture and integration philosophy](docs/architecture.md)
-- [CI with GitHub Actions](docs/ci.md)
-- [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+- [Decision Contract reference](https://github.com/suffro/decguard/blob/main/docs/contracts.md)
+- [Backends: System One (Kev, Jev), HTTP, plugins](https://github.com/suffro/decguard/blob/main/docs/backends.md)
+- [Reports, metrics and gates](https://github.com/suffro/decguard/blob/main/docs/reports.md)
+- [Metamorphic properties, fuzzing and replay](https://github.com/suffro/decguard/blob/main/docs/properties.md)
+- [Regression diffs](https://github.com/suffro/decguard/blob/main/docs/regression.md)
+- [Post-deployment checks and record format](https://github.com/suffro/decguard/blob/main/docs/production.md)
+- [Runtime cascade policy and Python SDK](https://github.com/suffro/decguard/blob/main/docs/policy.md)
+- [Architecture and integration philosophy](https://github.com/suffro/decguard/blob/main/docs/architecture.md)
+- [CI with GitHub Actions](https://github.com/suffro/decguard/blob/main/docs/ci.md)
+- [Contributing](https://github.com/suffro/decguard/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/suffro/decguard/blob/main/CHANGELOG.md)
 
 ## What DecGuard is not
 
