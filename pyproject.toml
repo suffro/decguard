@@ -1,6 +1,6 @@
 [project]
 name = "decguard"
-version = "0.1.0"
+version = "0.1.1"
 description = "Test, verify and gate probabilistic AI decision models across interchangeable backends."
 readme = "README.md"
 license = "Apache-2.0"

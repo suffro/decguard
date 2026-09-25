@@ -2,9 +2,10 @@
 
 ## Current focus
 
-Adding the tag-triggered release workflow (`.github/workflows/release.yml`, branch
-`v0.1-release-workflow`). Steps 1–3, release validation and real backends (PR #5) are
-merged to `main`. Nothing is tagged or published yet.
+`0.1.0` is released: tag `v0.1.0` on `ca2373a`, published to PyPI by `release.yml`
+(Trusted Publishing, attestations) with the same wheel and sdist on the GitHub Release.
+The repository is public. `0.1.1` (on `main`, not yet tagged) only fixes the README, which
+is the PyPI project page: install with `pip install decguard`, absolute GitHub links.
 
 ## Recent relevant changes
 
@@ -23,7 +24,7 @@ merged to `main`. Nothing is tagged or published yet.
 - Release validation: canonical reports now recompute and verify counts, metrics, failures,
   property summaries, checks and status on load; HTTP error bodies are not persisted,
   authenticated healthchecks cannot cross origins, and secret-like metadata is redacted;
-  the wheel metadata is `0.1.0`; the runnable demo covers calibration, regression and
+  the runnable demo covers calibration, regression and
   production drift.
 - Real backends: built-in `systemone` backend (TypeSafe System One wire format) for Kev,
   Jev and OpenRouter's Decisions API; opt-in `real_kev` / `real_jev` tests
@@ -37,7 +38,6 @@ merged to `main`. Nothing is tagged or published yet.
   metadata contains only compatible permissive licenses plus Certifi's MPL-2.0; `uv.lock`
   is current and every registry artifact is hash-pinned. No runtime dependency was added
   for the real backends.
-
 - Release workflow: pushing a `vX.Y.Z` tag validates the tag against `pyproject.toml` and
   CHANGELOG, builds and checks the distributions once, publishes them to PyPI with Trusted
   Publishing (environment `pypi`, no stored token), then creates the GitHub Release with
@@ -45,13 +45,11 @@ merged to `main`. Nothing is tagged or published yet.
 
 ## Next
 
-- Merge the release-workflow PR, then add the PyPI pending trusted publisher
-  (`suffro`/`decguard`, `release.yml`, environment `pypi`). GitHub creates the `pypi`
-  environment on the first run; tag restrictions/reviewers on it are optional hardening.
-- Then push the `v0.1.0` tag on a `main` commit with green CI and real-backend runs.
+- Release `0.1.1` (push `v0.1.1` on the `main` commit with the README fix) so PyPI shows the
+  corrected page; a released version's PyPI description cannot be edited.
 
 ## Blockers
 
-- The PyPI trusted publisher must exist before the tag is pushed; without it the publish
-  job fails. To re-run the real-backend check,
-  dispatch `real-backends.yml` (it needs the repository secret `OPENROUTER_API_KEY`).
+- None. The PyPI trusted publisher (`suffro`/`decguard`, `release.yml`, environment `pypi`)
+  is configured. To re-run the real-backend check, dispatch `real-backends.yml` (it needs
+  the repository secret `OPENROUTER_API_KEY`).
