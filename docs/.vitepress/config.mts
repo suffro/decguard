@@ -96,9 +96,16 @@ export default defineConfig({
     ['meta', { property: 'og:site_name', content: 'DecGuard' }],
     ['meta', { property: 'og:title', content: 'DecGuard' }],
     ['meta', { property: 'og:description', content: description }],
-    ['meta', { name: 'twitter:card', content: 'summary' }],
+    // The same 1280×640 card as the GitHub repository's social preview. Crawlers need an absolute URL.
+    ['meta', { property: 'og:image', content: `${hostname}/static/png/social-preview.png` }],
+    ['meta', { property: 'og:image:type', content: 'image/png' }],
+    ['meta', { property: 'og:image:width', content: '1280' }],
+    ['meta', { property: 'og:image:height', content: '640' }],
+    ['meta', { property: 'og:image:alt', content: 'DecGuard: reliability testing for probabilistic AI decisions' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
     ['meta', { name: 'twitter:title', content: 'DecGuard' }],
     ['meta', { name: 'twitter:description', content: description }],
+    ['meta', { name: 'twitter:image', content: `${hostname}/static/png/social-preview.png` }],
   ],
 
   markdown: {

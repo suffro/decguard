@@ -31,7 +31,9 @@
   `npm run build`: test those buttons with `npm run preview`, not `npm run dev`.
 - Logos: `docs/public/static/svg/logo-{dark,light}.svg` (dark mark for light backgrounds),
   `docs/public/static/svg/favicon.svg` (same mark, adapts to the color scheme) and
-  `docs/public/favicon.ico`.
+  `docs/public/favicon.ico`. The social card is `docs/public/static/png/social-preview.png`
+  (1280×640), used by the docs' `og:image`/`twitter:image` and uploaded by hand as the GitHub
+  repository's social preview (Settings → General; there is no API for it).
 - `README.md` is also the PyPI project page: link with absolute GitHub URLs, not
   repository-relative paths.
 
