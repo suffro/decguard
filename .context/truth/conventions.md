@@ -29,6 +29,20 @@
   `<link rel="alternate" type="text/markdown">`, which `theme/PageActions.vue` (the
   Markdown / Ask an AI buttons in the `doc-before` slot) reads. Twins exist only after
   `npm run build`: test those buttons with `npm run preview`, not `npm run dev`.
+- The home page response carries RFC 8288 `Link` headers for agents (`service-doc` →
+  `/introduction`, `describedby` → `llms.txt`/`llms-full.txt`, `alternate` → `index.md`,
+  `api-catalog` → `/.well-known/api-catalog`), set in `docs/public/_headers`. That file is
+  Cloudflare Pages config: `npm run preview` ignores it, so check it with
+  `curl -I https://decguard.com` after a deploy.
+- `docs/public/.well-known/api-catalog` is a static RFC 9727 linkset (its
+  `application/linkset+json` type is set in `_headers`, since the file has no extension). It
+  lists one API, the `decguard.http/0.1` protocol: the OpenAPI 3.1 description
+  `docs/public/openapi/decguard-http-0.1.json` (`service-desc`) and `docs/http.md`
+  (`service-doc`). DecGuard hosts no API, so there is no `status` link. Both files hard-code
+  `https://decguard.com`. When the protocol or `HttpBackend` request/response handling
+  changes, update the OpenAPI file with it. Check with
+  `uvx openapi-spec-validator docs/public/openapi/decguard-http-0.1.json`; after a deploy,
+  scan with `https://isitagentready.com/api/scan` (`checks.discovery.apiCatalog`).
 - Logos: `docs/public/static/svg/logo-{dark,light}.svg` (dark mark for light backgrounds),
   `docs/public/static/svg/favicon.svg` (same mark, adapts to the color scheme) and
   `docs/public/favicon.ico`. The social card is `docs/public/static/png/social-preview.png`

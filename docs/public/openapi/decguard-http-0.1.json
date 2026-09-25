@@ -1,0 +1,205 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DecGuard HTTP decision protocol",
+    "version": "decguard.http/0.1",
+    "summary": "The endpoint DecGuard's generic http backend calls: one POST per decision, answered with a probability per label.",
+    "description": "DecGuard does not host this API. You implement it in front of your model, and DecGuard's `http` backend calls it while it tests the model. The endpoint's full URL is the contract's `backend.url` (so `/decide` below stands for whatever path you choose), and the optional healthcheck is `backend.health_url`. Credentials are sent only as request headers taken from environment variables (`bearer_token_env`, `headers_from_env`). DecGuard does not follow redirects, and it retries only connection failures and HTTP 502/503/504, up to `max_retries` times. The human-readable reference is https://decguard.com/http.",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "externalDocs": {
+    "description": "Generic HTTP backend and protocol reference",
+    "url": "https://decguard.com/http"
+  },
+  "servers": [
+    {
+      "url": "{origin}",
+      "description": "Your decision service.",
+      "variables": {
+        "origin": {
+          "default": "http://127.0.0.1:8080",
+          "description": "Scheme, host and port of the backend URL in the contract."
+        }
+      }
+    }
+  ],
+  "security": [
+    {},
+    {
+      "bearer": []
+    }
+  ],
+  "paths": {
+    "/decide": {
+      "post": {
+        "operationId": "decide",
+        "summary": "Answer one decision",
+        "description": "Called once per case. Present `decision.labels` to the model in the order and form given, and key `probabilities` by those labels exactly as sent: during fuzzing DecGuard reorders or reformats them (for example `[\"REFUND\", \"REJECT\", \"REVIEW\"]`) and maps the answer back to the contract labels.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              },
+              "example": {
+                "protocol": "decguard.http/0.1",
+                "case_id": "r1",
+                "model": "refund-v3",
+                "decision": {
+                  "name": "refund_request",
+                  "type": "choice",
+                  "labels": ["refund", "reject", "review"]
+                },
+                "input": "The blender arrived damaged."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The model's answer. Invalid JSON or a missing or malformed `probabilities` object makes the case `invalid_response`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResponse"
+                },
+                "example": {
+                  "probabilities": {
+                    "refund": 0.91,
+                    "reject": 0.02,
+                    "review": 0.07
+                  },
+                  "model": "refund-v3",
+                  "model_version": "2026-09-01",
+                  "metadata": {
+                    "tokens": 41
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Retried up to `max_retries`, then the case is `unavailable`."
+          },
+          "503": {
+            "description": "Retried up to `max_retries`, then the case is `unavailable`."
+          },
+          "504": {
+            "description": "Retried up to `max_retries`, then the case is `unavailable`."
+          },
+          "default": {
+            "description": "Any other non-2xx status makes the case `backend_error`. The response body is not recorded."
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "Optional healthcheck",
+        "description": "Called only when the contract sets `backend.health_url`, which then stands for this path. When environment-backed headers are configured it must share the origin of `backend.url`. The body is ignored.",
+        "responses": {
+          "2XX": {
+            "description": "Healthy."
+          },
+          "default": {
+            "description": "Unhealthy."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Sent when the contract sets `bearer_token_env`; the token is read from that environment variable. Other headers can come from `headers_from_env`."
+      }
+    },
+    "schemas": {
+      "DecisionRequest": {
+        "type": "object",
+        "required": ["protocol", "case_id", "model", "decision", "input"],
+        "additionalProperties": false,
+        "properties": {
+          "protocol": {
+            "const": "decguard.http/0.1"
+          },
+          "case_id": {
+            "type": "string",
+            "description": "The dataset case id, or the id given to `decguard run` or the SDK."
+          },
+          "model": {
+            "type": ["string", "null"],
+            "description": "The backend's `model` setting, or null when it is not set."
+          },
+          "decision": {
+            "type": "object",
+            "required": ["name", "type", "labels"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The decision name from the contract."
+              },
+              "type": {
+                "enum": ["choice", "noul", "score"],
+                "description": "`choice`: one of several unordered options. `noul`: a boolean decision with two labels, positive first. `score`: an ordered scale, lowest level first."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "description": "The labels to present, in order, in the backend's names (after `label_map`). Not always the contract order."
+              }
+            }
+          },
+          "input": {
+            "description": "The case input.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          }
+        }
+      },
+      "DecisionResponse": {
+        "type": "object",
+        "required": ["probabilities"],
+        "properties": {
+          "probabilities": {
+            "type": "object",
+            "description": "One probability per label sent, keyed exactly as sent: finite, non-negative and summing to 1 within the contract's `evaluation.probability_tolerance`. DecGuard never repairs an invalid distribution.",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "model": {
+            "type": ["string", "null"],
+            "description": "The model that answered."
+          },
+          "model_version": {
+            "type": ["string", "null"],
+            "description": "Its version."
+          },
+          "metadata": {
+            "type": ["object", "null"],
+            "description": "Stored with the result; common credential keys are redacted."
+          }
+        }
+      }
+    }
+  }
+}

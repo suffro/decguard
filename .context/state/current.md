@@ -57,6 +57,11 @@ attestations) with the same files on the GitHub Releases. The repository is publ
 
 ## Next
 
+- After the next docs deploy, confirm the RFC 9727 API catalog is served: `curl -I
+  https://decguard.com/.well-known/api-catalog` (200, `application/linkset+json` with the
+  RFC 9727 profile) and the isitagentready.com scan (`checks.discovery.apiCatalog` =
+  `pass`). If the scanner rejects the `profile` parameter, drop it from `_headers`.
+
 - Merge the documentation PR, then configure hosting and deployment for `decguard.com`
   (the site has no deployment workflow). Once it is live, point
   `project.urls.Documentation` in `pyproject.toml` and the README at it, and consider

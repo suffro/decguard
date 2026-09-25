@@ -1,0 +1,18 @@
+# Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/).
+#
+# Link headers on the homepage point agents at the machine-readable docs (RFC 8288):
+# service-doc is the documentation entry point, describedby the llms.txt index,
+# alternate the Markdown twin of this page, and api-catalog the RFC 9727 catalog.
+
+/
+  Link: </introduction>; rel="service-doc"; type="text/html"
+  Link: </llms.txt>; rel="describedby"; type="text/plain"
+  Link: </llms-full.txt>; rel="describedby"; type="text/plain"
+  Link: </index.md>; rel="alternate"; type="text/markdown"
+  Link: </.well-known/api-catalog>; rel="api-catalog"
+
+# The API catalog (RFC 9727). The file has no extension, so its type must be stated: a linkset
+# with the RFC's profile. RFC 9727 also wants the api-catalog relation on this resource, for HEAD.
+/.well-known/api-catalog
+  Content-Type: application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"
+  Link: </.well-known/api-catalog>; rel="api-catalog"

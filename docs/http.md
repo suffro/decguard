@@ -60,6 +60,11 @@ Security rules:
 
 ## Protocol `decguard.http/0.1`
 
+The protocol is also published as an
+[OpenAPI 3.1 description](https://decguard.com/openapi/decguard-http-0.1.json), listed in
+the site's [API catalog](https://decguard.com/.well-known/api-catalog), for generating a
+server stub or validating your endpoint.
+
 ### Request
 
 ```http

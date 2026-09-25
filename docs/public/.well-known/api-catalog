@@ -1,0 +1,35 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://decguard.com/.well-known/api-catalog",
+      "item": [
+        {
+          "href": "https://decguard.com/http#protocol-decguard-http-0-1",
+          "title": "DecGuard HTTP decision protocol (decguard.http/0.1)"
+        }
+      ]
+    },
+    {
+      "anchor": "https://decguard.com/http#protocol-decguard-http-0-1",
+      "service-desc": [
+        {
+          "href": "https://decguard.com/openapi/decguard-http-0.1.json",
+          "type": "application/vnd.oai.openapi+json;version=3.1",
+          "title": "OpenAPI 3.1 description of decguard.http/0.1"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://decguard.com/http",
+          "type": "text/html",
+          "title": "Generic HTTP backend and protocol reference"
+        },
+        {
+          "href": "https://decguard.com/http.md",
+          "type": "text/markdown",
+          "title": "Generic HTTP backend and protocol reference (Markdown)"
+        }
+      ]
+    }
+  ]
+}

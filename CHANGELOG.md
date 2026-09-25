@@ -20,7 +20,12 @@ versioned separately.
   next to `/quickstart.html`), `/llms.txt` and `/llms-full.txt`. Every page except the home
   page has buttons to copy or view its Markdown and to open it in Claude, ChatGPT, Mistral
   or Perplexity. The site uses the DecGuard logo and favicon, and publishes `sitemap.xml`,
-  `robots.txt` and canonical links for `https://decguard.com`.
+  `robots.txt` and canonical links for `https://decguard.com`. The home page response carries
+  `Link` headers (`service-doc`, `describedby`, `alternate`, `api-catalog`) pointing agents at
+  those files.
+- An OpenAPI 3.1 description of the `decguard.http/0.1` protocol at
+  `/openapi/decguard-http-0.1.json`, listed with the HTTP backend docs in an RFC 9727 API
+  catalog at `/.well-known/api-catalog`.
 
 ## [0.1.1] - 2026-09-25
 
