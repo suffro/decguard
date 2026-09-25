@@ -37,5 +37,5 @@ Build backend: `hatchling`. Tooling: `uv` (lockfile `uv.lock` committed), `ruff`
 ## Consequences
 
 - `pip install decguard` stays light and pure-Python.
-- Metric definitions are ours to keep correct; `docs/reports.md` documents every formula
+- Metric definitions are ours to keep correct; `docs/metrics.md` documents every formula
   and the tests pin them. Any change to a metric definition is a report-format change.

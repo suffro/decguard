@@ -1,79 +1,156 @@
-# Reports, metrics and gates
+---
+description: The JSON reports DecGuard writes - test/fuzz reports, diff, replay and production reports - their integrity checks, and every input format at a glance.
+---
 
-`decguard test` produces one report. `--output report.json` writes it as JSON,
-`--format json` prints it to stdout; the default terminal view is a summary of the same
-data.
+# Reports and formats
 
-## JSON report (`report_version` 0.1)
+Every command that evaluates something produces a versioned JSON document. The terminal
+output is a summary of the same data: `--format json` prints the full document to stdout,
+and `--output FILE` writes it.
 
-| field | content |
+| Document | Written by | Version field |
+| --- | --- | --- |
+| [Report](#report) | `test`, `fuzz`, `test --all`, `report` | `report_version: "0.1"` |
+| [Diff report](#diff-report) | `diff` | `diff_version: "0.1"` |
+| [Replay report](#replay-report) | `replay --format json` | `replay_version: "0.1"` |
+| [Production report](#production-report) | `check` | `check_version: "0.1"` |
+
+All of them carry `decguard_version`, `created_at`, `status` (`pass`, `warn` or `fail`)
+and `exit_code`. Their formats are versioned independently of the package: a change in
+meaning comes with a version bump and a changelog entry.
+
+## Report
+
+The report of `decguard test` and `decguard fuzz`.
+
+| Field | Content |
 | --- | --- |
 | `report_version`, `decguard_version`, `created_at` | format and tool provenance |
 | `mode` | `test` (golden gates), `fuzz` (properties) or `all` (both) |
-| `status`, `exit_code` | `pass` / `warn` / `fail`, and 0 / 0 / 1 |
-| `contract` | name, type, labels, schema version, `sha256:` hash, path |
-| `dataset` | path, `sha256:` hash of the file bytes, case and labeled counts |
-| `backend`, `health` | backend name, provider, model, version, redacted details; healthcheck result |
-| `evaluation`, `requirements`, `warnings` | the evaluation and gate settings used |
-| `metrics` | `counts`, `classification`, `calibration`, `selective`, `latency` |
-| `checks` | one entry per gate: level, metric, comparison, threshold, value, status |
+| `status`, `exit_code` | `pass` / `warn` / `fail`, and `0` / `0` / `1` |
+| `contract` | `name`, `type`, `labels`, `schema_version`, `hash` (`sha256:`), `path` |
+| `dataset` | `path`, `hash` (`sha256:` of the file bytes), `n_cases`, `n_labeled` |
+| `backend` | `name`, `provider`, `model`, `model_version`, `details` (redacted provider details) |
+| `health` | healthcheck `status` (`ok` / `unhealthy` / `unknown`) and `detail` |
+| `evaluation`, `requirements`, `warnings` | the settings and gates used |
+| `metrics` | `counts`, `classification`, `calibration` (with `reliability` bins), `selective`, `latency` |
+| `checks` | one entry per gate: `gate`, `level`, `metric`, `comparison`, `threshold`, `value`, `status`, `message` |
 | `failures` | failing examples (errors and wrong answers) with their inputs |
-| `results` | every case: input, expected, metadata, and a `result` or an `error` |
-| `properties` | `fuzz`/`all` only: seed, fuzz and property settings, per-property `summaries`, every transformed case in `pairs` (steps, input, option presentation, result, comparison, violations, `reduced` example), `skipped` cases with reasons |
+| `results` | every case: `case_id`, `input`, `expected`, `metadata`, and either a `result` or an `error` |
+| `properties` | `fuzz`/`all` only: see below |
 
-Loading a report re-checks every stored result: probabilities over exactly the contract
-labels, in canonical order, summing to 1 within the recorded `probability_tolerance`;
-`selected` equal to the argmax (ties to the first label) and `confidence` equal to its
-probability; and exactly one of `result` or `error` per case. Transformed cases are
-checked the same way. Their comparison and violations must also match what their stored
-results and the recorded property settings imply. Dataset counts, aggregate metrics,
-failure examples, property summaries, checks, status and exit code are recomputed and
-must agree. A tampered or corrupted report is rejected with exit code 2.
+A check entry:
 
-Because `results` holds every normalized decision, `decguard report <file> --contract
-<contract>` can recompute metrics and re-apply gates offline; recomputation from the same
-results is bit-identical. For `fuzz`/`all` reports it also re-applies the edited property
-limits and levels to the stored transformed cases (transformations are not regenerated).
+```json
+{
+  "gate": "min_accuracy",
+  "level": "requirement",
+  "metric": "accuracy",
+  "comparison": ">=",
+  "threshold": 0.9,
+  "value": 1.0,
+  "status": "pass",
+  "message": "accuracy 1 >= 0.9"
+}
+```
 
-`decguard diff` writes a separate diff report (`diff_version` 0.1, see
-[regression.md](regression.md)); `decguard replay --format json` a replay report
-(`replay_version` 0.1, see [properties.md](properties.md)); and `decguard check` a
-post-deployment report (`check_version` 0.1, see [production.md](production.md)).
+A result entry holds the normalized
+[`DecisionResult`](./decisions.md#the-normalized-decisionresult); an error entry holds its
+`kind` and message.
 
-## Metrics
+### `properties`
 
-Classification and calibration metrics use **labeled** cases the backend decided. Coverage
-and latency use all decided cases. Errors are counted separately and never dropped.
+Present in `fuzz` and `all` reports:
 
-- **accuracy**: share of labeled cases where the selected label is the expected one.
-- **macro_f1**: unweighted mean F1 over labels that appear as expected or predicted
-  (scikit-learn's `average="macro"`; undefined precision/recall count as 0).
-  `per_label` has precision, recall, F1 and support for each label.
-- **ordinal_mae** (score only): mean |predicted level − expected level| in scale steps.
-- **nll**: mean −ln p(expected). p is floored at 1e-15, so a confident miss adds about 34.5
-  instead of infinity.
-- **brier**: multi-class Brier score, mean of Σₖ (pₖ − yₖ)², range 0–2. (For two labels this
-  is twice the binary `(p − y)²` form.)
-- **ece**: expected calibration error over top-label confidence with `calibration_bins`
-  equal-width bins; bin *i* covers (i/n, (i+1)/n], the first also includes 0. `reliability`
-  lists count, mean confidence and accuracy per bin.
-- **coverage / abstention_rate**: share of decisions with confidence ≥ / <
-  `evaluation.confidence_threshold`. **selective_accuracy**: accuracy on labeled cases at or
-  above it.
-- **error_rate**: errored cases / all cases, with `errors_by_kind`.
-- **latency**: mean, p50/p90/p95/p99 (linear interpolation, NumPy's default) and max of the
-  time spent in the backend call, in milliseconds.
+| Field | Content |
+| --- | --- |
+| `seed` | the transformation seed used |
+| `fuzz`, `config` | the fuzz settings and every property's settings |
+| `summaries` | per property: counts of transformed, skipped, errored and evaluated cases; violations and flips with their rates; max TV, JS and deltas |
+| `pairs` | every transformed case: `id` (`<property>/<case id>/<sample>`), `steps`, `input`, `presentation` (option shown → contract label), `result` or `error`, `comparison`, `violations`, and a `reduced` minimal example when minimized |
+| `skipped` | cases a property could not transform, with the reason |
 
-Calibration is reported separately from accuracy on purpose: a model can be accurate and
-badly calibrated, which matters as soon as its confidence drives an action.
+### Integrity on load
 
-## Status and exit codes
+Loading a report — with `report`, `diff` or `replay` — re-verifies it completely:
 
-- **FAIL** (exit 1): at least one requirement does not hold, including the implicit
-  `max_error_rate: 0` (and `<property>.max_error_rate: 0`), a gated metric could not be
-  computed, or a requirement-level property is violated.
-- **WARN** (exit 0, or 1 with `--fail-on-warn`): requirements hold, a warning gate does not.
-- **PASS** (exit 0): everything holds.
-- Exit **2**: the run could not be evaluated: invalid contract or dataset, unknown backend,
-  missing credentials, unhealthy backend, every case failing, invalid CLI usage, or an
-  internal error.
+- every stored result has probabilities over exactly the contract labels, in canonical
+  order, summing to 1 within the recorded `probability_tolerance`; `selected` is the
+  argmax (ties to the first label) and `confidence` its probability;
+- each case has exactly one of `result` or `error`;
+- transformed cases are checked the same way, and their comparisons and violations must
+  match what their results and the recorded property settings imply;
+- dataset counts, aggregate metrics, failure examples, property summaries, checks, status
+  and exit code are recomputed and must agree with the stored values.
+
+A tampered or corrupted report is rejected with exit code `2`.
+
+### Re-evaluation
+
+Because `results` holds every normalized decision,
+`decguard report report.json --contract edited.yaml` recomputes metrics and re-applies the
+edited gates offline. Recomputation from the same results is bit-identical. For `fuzz` and
+`all` reports it also re-applies edited property limits and levels to the stored
+transformed cases; transformations are not regenerated.
+
+## Diff report
+
+Written by [`decguard diff`](./regression.md).
+
+| Field | Content |
+| --- | --- |
+| `contract` | the decision compared |
+| `baseline`, `candidate` | provenance of each run: `path`, `created_at`, `mode`, `contract_hash`, `dataset`, `backend` |
+| `same_dataset` | whether both runs used the same dataset file (by hash) |
+| `evaluation` | settings used to recompute metrics on matched cases |
+| `counts` | cases per run, matched, only in one run, compared; answer flips, newly wrong/correct; newly errored, recovered, still errored |
+| `shift` | answer flip rate; mean and max TV distance; mean JS divergence; mean, mean absolute and max absolute confidence delta |
+| `metrics` | per metric: `baseline`, `candidate`, `delta` |
+| `segments` | per segment: key, value, size, accuracy before and after, flip rate |
+| `checks` | regression gates, same shape as report checks |
+| `changes` | each flipped, newly errored or recovered case with its input, answers and confidences |
+
+## Replay report
+
+Printed by `decguard replay --format json`.
+
+| Field | Content |
+| --- | --- |
+| `source` | the report replayed |
+| `contract_path`, `contract_hash`, `contract_changed` | the contract used, and whether it differs from the one recorded |
+| `backend` | the backend replayed against |
+| `outcomes` | per replayed failure: `id`, `property`, `case_id`; `regenerated` (the seed regenerates the stored transformation; `null` for non-deterministic paraphrase providers); the new `original` result or `original_error`; the re-judged `examples` (transformed and reduced); and `reproduced` |
+
+## Production report
+
+Written by [`decguard check`](./production.md).
+
+| Field | Content |
+| --- | --- |
+| `contract`, `evaluation` | the decision and settings used |
+| `config` | the `production` section: segments and gates |
+| `dataset` | `path`, `hash`, `n_records`, `n_outcomes`, `n_correctness` |
+| `baseline` | `source` (`dataset` or `report`), `path`, `hash`, `n_records` and `metrics`, or `null` |
+| `metrics` | `counts`, `outcomes`, `calibration`, `confidence` (with histogram), `threshold`, `routing`, `latency_ms`, `cost` |
+| `drift` | `confidence_tv_distance`, `confidence_mean_delta`, `accuracy_drop`, `ece_increase` (`null` without a baseline) |
+| `segments` | per metadata group: key, value, metrics, checks |
+| `checks` | aggregate and segment checks |
+| `records` | every normalized record |
+
+A production report can be passed back as `--baseline` to the next `decguard check`; its
+records are validated again against the contract when it is loaded.
+
+## Input formats
+
+| Format | Used by | Reference |
+| --- | --- | --- |
+| Decision Contract (YAML/JSON) | every command | [Decision Contract](./contracts.md) |
+| Golden dataset (JSONL/JSON) | `validate`, `test`, `fuzz` | [Golden datasets](./datasets.md#format) |
+| Production records (JSONL/JSON) | `check` | [Record schema](./production.md#record-schema) |
+| Paraphrase file (JSONL) | `paraphrase` with `provider: file` | [Paraphrase providers](./properties.md#paraphrase) |
+| `decguard.http/0.1` request/response | `http` backend | [HTTP protocol](./http.md#protocol-decguard-http-0-1) |
+| System One request/answer | `systemone` backend | [Wire format](./systemone.md#wire-format) |
+
+Status semantics and exit codes are described in
+[Requirements and warnings](./gates.md#exit-codes) and the
+[CLI reference](./cli.md#exit-codes).

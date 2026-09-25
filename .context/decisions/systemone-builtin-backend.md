@@ -64,4 +64,4 @@ github.com/jaredpalmer/kev.
   and downloads about 1.8 GB of weights, which are cached by pinned revision. That is why
   the workflow is manual.
 - Changing the pinned Kev commit, checkpoint or Jev model means updating the workflow env,
-  `docs/backends.md` and the real contracts together.
+  `docs/systemone.md` and the real contracts together.

@@ -1,6 +1,6 @@
 """Opt-in end-to-end checks against real System One backends. Nothing here is mocked.
 
-    uv run pytest -m real_kev   # needs a Kev server on 127.0.0.1:8009 (docs/backends.md)
+    uv run pytest -m real_kev   # needs a Kev server on 127.0.0.1:8009 (docs/systemone.md)
     uv run pytest -m real_jev   # needs OPENROUTER_API_KEY; three billed Jev calls
 
 Without ``-m`` these tests are skipped. Once selected with ``-m``, a missing server,

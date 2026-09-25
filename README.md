@@ -1,33 +1,33 @@
 # DecGuard
 
-Test, verify and gate **probabilistic AI decision models** — models that answer a typed
-question (pick an option, say yes/no, assign a level) with a probability for each answer.
+Reliability testing for **probabilistic AI decisions**: models that answer a typed
+question — pick an option, say yes or no, assign a level — with a probability for each
+answer.
 
-DecGuard sits above your decision backends. You describe the decision once in a small
-**contract**, run a dataset through any backend, and get one reproducible **reliability
-report** with CI-friendly PASS / WARN / FAIL gates.
+You describe the decision once in a small **Decision Contract**, run a dataset through
+any backend, and get one reproducible **reliability report** with CI-friendly
+PASS / WARN / FAIL gates. DecGuard measures accuracy and calibration, fuzzes behavioral
+invariants, compares model versions, and checks production records offline.
 
-> Status: alpha (v0.1). Contracts, backends, golden-dataset testing, metrics, reports, metamorphic fuzzing,
-> regression/replay, offline post-deployment checks, explicit cascade policies and the
-> Python SDK are implemented. The `systemone` backend is validated end to end against a
-> real Kev-0.8B server and real Jev through OpenRouter, on Linux and macOS.
+> Status: alpha (v0.1). The contract format and reports are versioned; the `systemone`
+> backend is validated end to end against a real Kev-0.8B server and real Jev through
+> OpenRouter, on Linux and macOS.
 
 ## Install
 
 ```bash
-pip install decguard         # or: uv tool install decguard
+pip install decguard          # or: uv tool install decguard
 ```
 
-Python 3.11+.
+Python 3.11+. Four runtime dependencies (pydantic, typer, httpx, PyYAML); no GPU,
+server or account.
 
-## 5-minute quickstart
-
-The quickstart uses the example contract and datasets from the repository:
+## Quickstart
 
 ```bash
 git clone --depth 1 https://github.com/suffro/decguard && cd decguard
 decguard validate examples/refund/decguard.yaml
-decguard test examples/refund/decguard.yaml --all --output stable.json
+decguard test examples/refund/decguard.yaml --all
 ```
 
 ```text
@@ -41,30 +41,33 @@ DecGuard 0.1.1 · refund_request (choice) · PASS
   Checks
     PASS  min_accuracy                           accuracy 1 >= 0.9
     PASS  max_ece                                ece 0.139 <= 0.15
+    PASS  option_order.max_violation_rate        option_order.violation_rate 0 <= 0 (per case: max_tv_distance 0.03)
     ...
 PASS: all gates hold
 ```
 
-A contract looks like this ([full reference](https://github.com/suffro/decguard/blob/main/docs/contracts.md)):
+A contract ([reference](https://github.com/suffro/decguard/blob/main/docs/contracts.md)):
 
 ```yaml
 schema_version: "0.1"
 
 decision:
   name: refund_request
+  description: How should this customer refund request be handled?
   type: choice                # choice | noul | score
   options: [refund, reject, review]
 
 backend:
-  provider: http              # or: systemone (Kev, Jev), mock, an installed plugin
-  url: https://decisions.internal/v1/decide
-  model: open-jev-2b
-  bearer_token_env: DECISIONS_TOKEN
+  provider: systemone         # or: mock, http, an installed plugin
+  model: typesafe/jev-1.13
+  url: https://openrouter.ai/api/alpha/decisions
+  bearer_token_env: OPENROUTER_API_KEY
 
 dataset: cases.jsonl          # {"input": ..., "expected": ...?, "metadata": ...?} per line
 
 evaluation:
   confidence_threshold: 0.8   # below this, a decision counts as an abstention
+  probability_tolerance: 0.02 # Jev rounds probabilities to two decimals
 
 requirements:                 # hard gates -> exit code 1
   min_accuracy: 0.95
@@ -72,125 +75,67 @@ requirements:                 # hard gates -> exit code 1
 
 warnings:                     # soft gates -> WARN
   max_latency_p95_ms: 300
+
+properties:                   # metamorphic checks (decguard fuzz / test --all)
+  option_order:
+    max_tv_distance: 0.03
 ```
 
-### Find what golden tests miss
+The [quickstart guide](https://github.com/suffro/decguard/blob/main/docs/quickstart.md) walks through writing your first contract
+and dataset.
 
-The refund example also defines `order_sensitive`, a backend that quietly favours whichever
-option is listed first. Its ordinary accuracy still looks perfect, but calibration and the
-metamorphic properties catch it:
-
-```bash
-decguard test examples/refund/decguard.yaml -b order_sensitive       # calibration FAIL
-decguard fuzz examples/refund/decguard.yaml -b order_sensitive -o fuzz.json
-```
-
-```text
-  Properties   seed 42
-    option_order         33 compared · 27 violating (81.8%) · flips 0 (0.0%) · max TV 0.100
-    label_format         22 compared · 0 violating (0.0%) · flips 0 (0.0%) · max TV 0.000
-    ...
-    FAIL  option_order.max_violation_rate        option_order.violation_rate 0.8182 violates <= 0 (per case: ...)
-  Property failures (10 of 27; replay with `decguard replay`)
-    option_order/r1/0
-      tv_distance 0.1 > 0.03
-      sent: options [reject, refund, review] · The blender arrived damaged and won't turn on.
-FAIL: at least one requirement does not hold
-```
-
-The broken run exits `1`, records the distribution drift and stores minimal failing
-examples. Replay it, then show that the same backend also breaks calibration and the
-regression limit:
-
-```bash
-decguard replay fuzz.json                                           # reproduces; exit 1
-decguard test examples/refund/decguard.yaml -b order_sensitive -o candidate.json
-decguard diff stable.json candidate.json -c examples/refund/decguard.yaml
-```
-
-### Check production records and route runtime decisions
-
-Analyze records your application collected—fully offline—and gate aggregate, drift and
-metadata-segment reliability:
-
-```bash
-decguard check examples/refund/decguard.yaml \
-  --dataset examples/refund/production.jsonl \
-  --output production-report.json
-```
-
-Compare an intentionally overconfident, incorrect batch to see calibration drift and
-localized segment failures (exit `1`):
-
-```bash
-decguard check examples/refund/decguard.yaml \
-  --dataset examples/refund/production-drift.jsonl \
-  --baseline examples/refund/production.jsonl
-```
-
-The same contract can deterministically route one normalized decision:
-
-```bash
-decguard run examples/refund/decguard.yaml "The blender arrived damaged"
-decguard run examples/refund/decguard.yaml "The parcel never arrived"
-decguard run examples/refund/decguard.yaml "Can someone call me?"
-```
-
-These three calls deterministically return `accept`, a `fallback -> strong_model`
-directive, and `human_review`. The fallback is not invoked automatically.
-
-See [post-deployment checks](https://github.com/suffro/decguard/blob/main/docs/production.md) and the
-[policy/SDK guide](https://github.com/suffro/decguard/blob/main/docs/policy.md).
-
-## Commands
+## Capabilities
 
 | Command | What it does |
 | --- | --- |
-| `decguard validate <contract>` | Check the contract, backend settings and dataset offline. |
-| `decguard test <contract>` | Run the dataset through a backend (`--backend NAME` picks a named one), print the report, `--output report.json` to keep it. |
-| `decguard fuzz <contract>` | Check the contract's metamorphic properties (option order, label format, irrelevant context, whitespace, paraphrase, noul inversion, score monotonicity); deterministic per `--seed`. |
-| `decguard test <contract> --all` | Golden gates and properties in one report. |
-| `decguard replay <report.json>` | Re-send stored property failures (`--id` for one); exit 1 if they still fail. |
-| `decguard diff <baseline.json> <candidate.json>` | Answer flips, confidence/distribution shifts, calibration, latency, error and per-segment changes; `--contract` applies `regression` gates. |
-| `decguard report <report.json>` | Show a stored report; `--contract` re-applies (possibly edited) gates without re-running the model. |
-| `decguard check <contract> --dataset <records>` | Analyze production JSONL/JSON offline, optionally against `--baseline`, with aggregate and segment gates. |
-| `decguard run <contract> <input>` | Make one decision and apply the contract's ordered policy. |
+| `decguard validate` | Check the contract, backend settings and dataset offline. |
+| `decguard test` | Golden-dataset metrics (accuracy, calibration, coverage, latency, errors) and gates; `--all` adds properties. |
+| `decguard fuzz` | Metamorphic properties: option order, label format, irrelevant/repeated context, whitespace, paraphrase, noul inversion, score monotonicity. Seeded and minimized. |
+| `decguard replay` | Re-send stored property failures; exit 1 if they still fail. |
+| `decguard diff` | Compare a baseline and a candidate run: flips, distribution and confidence shifts, calibration, errors, segments. |
+| `decguard report` | Show a stored report; `--contract` re-applies edited gates without re-running the model. |
+| `decguard check` | Analyze collected production records offline: calibration, drift, metadata segments. |
+| `decguard run` | Make one decision and apply the contract's policy: `accept`, `abstain`, `fallback` or `human_review`. |
 
-Exit codes: **0** pass (or warn; `--fail-on-warn` turns warn into 1), **1** a reliability
-gate failed, **2** configuration or runtime error. Use `--format json` for machine-readable
-output on stdout.
+Exit codes: **0** pass (or warn), **1** a reliability gate failed, **2** configuration or
+runtime error.
 
-### In CI
-
-```yaml
-- run: uv tool install decguard
-- run: decguard test decguard.yaml --all --output decguard-report.json
-- uses: actions/upload-artifact@v4
-  if: always()
-  with: { name: decguard-report, path: decguard-report.json }
-```
-
-A full workflow with a regression diff is in [docs/ci.md](https://github.com/suffro/decguard/blob/main/docs/ci.md).
+Backends: an offline `mock`, a generic `http` protocol, `systemone` for **Kev**
+(self-hosted), **Jev through OpenRouter** and TypeSafe endpoints — validated with real Kev
+and Jev inference on Linux and macOS — plus Python plugins.
 
 ## Documentation
 
-- [Decision Contract reference](https://github.com/suffro/decguard/blob/main/docs/contracts.md)
-- [Backends: System One (Kev, Jev), HTTP, plugins](https://github.com/suffro/decguard/blob/main/docs/backends.md)
-- [Reports, metrics and gates](https://github.com/suffro/decguard/blob/main/docs/reports.md)
-- [Metamorphic properties, fuzzing and replay](https://github.com/suffro/decguard/blob/main/docs/properties.md)
-- [Regression diffs](https://github.com/suffro/decguard/blob/main/docs/regression.md)
-- [Post-deployment checks and record format](https://github.com/suffro/decguard/blob/main/docs/production.md)
-- [Runtime cascade policy and Python SDK](https://github.com/suffro/decguard/blob/main/docs/policy.md)
-- [Architecture and integration philosophy](https://github.com/suffro/decguard/blob/main/docs/architecture.md)
-- [CI with GitHub Actions](https://github.com/suffro/decguard/blob/main/docs/ci.md)
-- [Contributing](https://github.com/suffro/decguard/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/suffro/decguard/blob/main/CHANGELOG.md)
+The full documentation is a [VitePress](https://vitepress.dev) site in [`docs/`](https://github.com/suffro/decguard/tree/main/docs):
+
+- Getting started: [What is DecGuard?](https://github.com/suffro/decguard/blob/main/docs/introduction.md) ·
+  [Installation](https://github.com/suffro/decguard/blob/main/docs/installation.md) · [Quickstart](https://github.com/suffro/decguard/blob/main/docs/quickstart.md)
+- Concepts: [Decisions and results](https://github.com/suffro/decguard/blob/main/docs/decisions.md) ·
+  [Golden datasets](https://github.com/suffro/decguard/blob/main/docs/datasets.md) · [Requirements and warnings](https://github.com/suffro/decguard/blob/main/docs/gates.md)
+- Testing: [Metrics](https://github.com/suffro/decguard/blob/main/docs/metrics.md) · [Metamorphic properties](https://github.com/suffro/decguard/blob/main/docs/properties.md) ·
+  [Fuzzing and replay](https://github.com/suffro/decguard/blob/main/docs/fuzzing.md) · [Regression diffs](https://github.com/suffro/decguard/blob/main/docs/regression.md)
+- Production: [Production checks](https://github.com/suffro/decguard/blob/main/docs/production.md) ·
+  [Policies and Python SDK](https://github.com/suffro/decguard/blob/main/docs/policy.md)
+- Backends: [Overview](https://github.com/suffro/decguard/blob/main/docs/backends.md) · [System One: Kev and Jev](https://github.com/suffro/decguard/blob/main/docs/systemone.md) ·
+  [HTTP](https://github.com/suffro/decguard/blob/main/docs/http.md) · [Custom backends](https://github.com/suffro/decguard/blob/main/docs/custom-backends.md)
+- Reference: [CLI](https://github.com/suffro/decguard/blob/main/docs/cli.md) · [Decision Contract](https://github.com/suffro/decguard/blob/main/docs/contracts.md) ·
+  [Reports and formats](https://github.com/suffro/decguard/blob/main/docs/reports.md)
+- [CI with GitHub Actions](https://github.com/suffro/decguard/blob/main/docs/ci.md) · [Architecture](https://github.com/suffro/decguard/blob/main/docs/architecture.md)
+
+To browse it locally (Node.js 18+):
+
+```bash
+npm ci
+npm run docs:dev
+```
 
 ## What DecGuard is not
 
-Not a model, not a generic LLM eval framework, not a hosted service or dashboard. It owns
-the decision-specific reliability layer (contract, normalized results, metrics, gates,
-report) and stays backend-neutral; other tools plug in as optional integrations.
+Not a model, a model server, a generic LLM evaluation framework or a hosted service. It
+owns the decision-specific reliability layer — contract, normalized results, metrics,
+gates, reports — and stays backend-neutral.
 
-## License
+## Contributing and license
 
-Apache-2.0
+See [CONTRIBUTING.md](https://github.com/suffro/decguard/blob/main/CONTRIBUTING.md) and the [changelog](https://github.com/suffro/decguard/blob/main/CHANGELOG.md).
+Licensed under Apache-2.0.
