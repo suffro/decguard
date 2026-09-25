@@ -78,6 +78,9 @@ versioned separately.
   revision; `typesafe/jev-1.13` on OpenRouter), and a manual `Real backends` workflow
   running them on Ubuntu and macOS. Selected tests fail, never skip, without their
   server, checkpoint or credential.
+- Tag-triggered `Release` workflow: a `vX.Y.Z` tag that matches the package version is
+  validated and built once. The same wheel and sdist are then published to PyPI through
+  Trusted Publishing (with attestations) and attached to a generated GitHub Release.
 
 ### Changed
 

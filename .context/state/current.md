@@ -2,9 +2,9 @@
 
 ## Current focus
 
-Closing the last v0.1 release blocker on branch `v0.1-real-backends` (PR #5): genuine
-decisions through real Kev and real Jev. Steps 1–3 and release validation are merged to
-`main`. Do not tag, publish or create the GitHub release until PR #5 is merged.
+Adding the tag-triggered release workflow (`.github/workflows/release.yml`, branch
+`v0.1-release-workflow`). Steps 1–3, release validation and real backends (PR #5) are
+merged to `main`. Nothing is tagged or published yet.
 
 ## Recent relevant changes
 
@@ -38,13 +38,20 @@ decisions through real Kev and real Jev. Steps 1–3 and release validation are 
   is current and every registry artifact is hash-pinned. No runtime dependency was added
   for the real backends.
 
+- Release workflow: pushing a `vX.Y.Z` tag validates the tag against `pyproject.toml` and
+  CHANGELOG, builds and checks the distributions once, publishes them to PyPI with Trusted
+  Publishing (environment `pypi`, no stored token), then creates the GitHub Release with
+  the same files. Procedure in CONTRIBUTING.md#releasing.
+
 ## Next
 
-- Merge PR #5 once standard CI and the `Real backends` workflow are green on its head.
-- Then tag `v0.1.0` and publish; neither is done yet.
+- Merge the release-workflow PR, then add the PyPI pending trusted publisher
+  (`suffro`/`decguard`, `release.yml`, environment `pypi`). GitHub creates the `pypi`
+  environment on the first run; tag restrictions/reviewers on it are optional hardening.
+- Then push the `v0.1.0` tag on a `main` commit with green CI and real-backend runs.
 
 ## Blockers
 
-- None known once PR #5's CI and real-backend runs are green. To re-run the real-backend
-  check: add the `real-backends` label to the PR (or, after merge, `workflow_dispatch`);
-  it needs the repository secret `OPENROUTER_API_KEY`.
+- The PyPI trusted publisher must exist before the tag is pushed; without it the publish
+  job fails. To re-run the real-backend check,
+  dispatch `real-backends.yml` (it needs the repository secret `OPENROUTER_API_KEY`).

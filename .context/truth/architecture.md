@@ -76,8 +76,10 @@ policy → action directive (fallback is not invoked automatically).
   at a pinned revision) and Jev via OpenRouter (`typesafe/jev-1.13`, `OPENROUTER_API_KEY`),
   exercised by `pytest -m real_kev` / `-m real_jev`; any other endpoint by
   `pytest -m external`.
-- GitHub Actions: `.github/workflows/ci.yml` (every PR/push to main) and
-  `.github/workflows/real-backends.yml` (manual or `real-backends` PR label; Ubuntu + macOS).
+- GitHub Actions: `.github/workflows/ci.yml` (every PR/push to main),
+  `.github/workflows/real-backends.yml` (manual or `real-backends` PR label; Ubuntu + macOS)
+  and `.github/workflows/release.yml` (`v*.*.*` tags only: validate/build → PyPI via
+  Trusted Publishing in environment `pypi` → GitHub Release; see CONTRIBUTING.md).
 
 ## Important constraints
 
