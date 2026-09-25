@@ -1,6 +1,6 @@
 """Generic HTTP backend for decision endpoints (System One APIs: see ``systemone.py``).
 
-Protocol ``decguard.http/0.1`` (see docs/backends.md)::
+Protocol ``decguard.http/0.1`` (see docs/http.md)::
 
     POST <url>
     {"protocol": "decguard.http/0.1", "case_id": "...", "model": "..." | null,

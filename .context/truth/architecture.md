@@ -50,6 +50,9 @@ explicit policies and SDK) are implemented.
   records, summaries, property checks, `rejudge`, load-time `verify_run`), `render.py`
   (terminal).
 - `engine.py`: `run_test(mode="test"|"fuzz"|"all")` orchestration shared by CLI and API.
+- `docs/`: the user documentation as a VitePress site (`docs/.vitepress/config.mts`, a
+  small theme extension in `docs/.vitepress/theme/`); Node tooling is dev-only
+  (`package.json`, `package-lock.json` at the root). Not part of the Python package.
 - `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`,
   offline `check`, and policy `run`.
 
@@ -69,8 +72,8 @@ policy → action directive (fallback is not invoked automatically).
 
 ## External systems
 
-- Decision backends over HTTP (`decguard.http/0.1` or System One, docs/backends.md) or
-  installed plugins. None is needed for the default test suite; a local stdlib HTTP server
+- Decision backends over HTTP (`decguard.http/0.1`, docs/http.md; System One,
+  docs/systemone.md) or installed plugins. None is needed for the default test suite; a local stdlib HTTP server
   backs the integration tests.
 - Real backends, opt-in only: a self-hosted Kev server (upstream `jaredpalmer/kev`, Kev-0.8B
   at a pinned revision) and Jev via OpenRouter (`typesafe/jev-1.13`, `OPENROUTER_API_KEY`),

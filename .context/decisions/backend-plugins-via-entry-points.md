@@ -17,7 +17,7 @@ are untrusted input, and the plan forbids executing arbitrary code from contract
   `DecisionResult` semantics.
 - Python code can also be used directly through `CallableBackend` in the Python API.
 - The generic HTTP backend speaks a small documented JSON protocol, `decguard.http/0.1`
-  (docs/backends.md), with `label_map` for differing label names. Credentials come only
+  (docs/http.md), with `label_map` for differing label names. Credentials come only
   from environment variables.
 - No real Open-Jev/Kev adapter ships in Step 1: their APIs were not available to design
   against, and CI must not need model downloads or GPUs. The opt-in external test

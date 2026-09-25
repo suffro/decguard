@@ -87,6 +87,7 @@ does not run the paid real-backend tests.
 
 ## Adding a backend
 
-See [docs/backends.md](docs/backends.md). Built-in adapters live in
+See [docs/custom-backends.md](docs/custom-backends.md) and
+[docs/backends.md](docs/backends.md). Built-in adapters live in
 `src/decguard/backends/`; third-party ones should be separate packages registered under the
 `decguard.backends` entry-point group.

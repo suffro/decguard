@@ -14,7 +14,7 @@ class CallableBackend(DecisionBackend):
     """Backend backed by ``fn(request) -> {label: probability}`` (or a ``Prediction``).
 
     Contracts cannot reference arbitrary Python code; to use a Python provider from the CLI,
-    package it as a ``decguard.backends`` entry point (see docs/backends.md).
+    package it as a ``decguard.backends`` entry point (see docs/custom-backends.md).
     """
 
     provider = "python"

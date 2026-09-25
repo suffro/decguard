@@ -2,10 +2,14 @@
 
 ## Current focus
 
-`0.1.0` is released: tag `v0.1.0` on `ca2373a`, published to PyPI by `release.yml`
-(Trusted Publishing, attestations) with the same wheel and sdist on the GitHub Release.
-The repository is public. `0.1.1` (on `main`, not yet tagged) only fixes the README, which
-is the PyPI project page: install with `pip install decguard`, absolute GitHub links.
+Documentation site (branch `docs/vitepress`): `docs/` is now a VitePress site with
+getting started, concepts, testing, production, backends, reference, CI and architecture
+sections; the README is a short landing page (absolute GitHub links, since it is the PyPI
+project page). Hosting/deployment of the site is deliberately not configured yet.
+
+Released: `0.1.0` (tag `v0.1.0` on `ca2373a`) and `0.1.1` (tag `v0.1.1` on `20b6b02`,
+README fix only), both published to PyPI by `release.yml` (Trusted Publishing,
+attestations) with the same files on the GitHub Releases. The repository is public.
 
 ## Recent relevant changes
 
@@ -38,6 +42,11 @@ is the PyPI project page: install with `pip install decguard`, absolute GitHub l
   metadata contains only compatible permissive licenses plus Certifi's MPL-2.0; `uv.lock`
   is current and every registry artifact is hash-pinned. No runtime dependency was added
   for the real backends.
+- Documentation: VitePress site in `docs/` (`npm run docs:build` fails on dead links);
+  existing page paths kept, backends split into `docs/systemone.md`, `docs/http.md` and
+  `docs/custom-backends.md`, metrics moved to `docs/metrics.md`, the fuzzing workflow to
+  `docs/fuzzing.md`.
+  Quickstart output was produced by the PyPI package.
 - Release workflow: pushing a `vX.Y.Z` tag validates the tag against `pyproject.toml` and
   CHANGELOG, builds and checks the distributions once, publishes them to PyPI with Trusted
   Publishing (environment `pypi`, no stored token), then creates the GitHub Release with
@@ -45,8 +54,9 @@ is the PyPI project page: install with `pip install decguard`, absolute GitHub l
 
 ## Next
 
-- Release `0.1.1` (push `v0.1.1` on the `main` commit with the README fix) so PyPI shows the
-  corrected page; a released version's PyPI description cannot be edited.
+- Merge the documentation PR, then choose and configure hosting for the VitePress site
+  (separate task; the site has no `base` or deployment workflow). Once a public docs URL
+  exists, point `project.urls.Documentation` in `pyproject.toml` and the README at it.
 
 ## Blockers
 

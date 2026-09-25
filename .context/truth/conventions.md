@@ -15,7 +15,13 @@
   test` and `decguard test --all` (`test_examples_pass`, `test_examples_pass_all_checks`).
 - Deterministic outputs that users may store (mock hash distribution, fuzz RNG stream)
   are pinned by tests; changing them is a CHANGELOG-worthy format change.
-- Docs for users in `docs/`; user-visible changes go in `CHANGELOG.md` under Unreleased.
+- Docs for users in `docs/`, a VitePress site: every page is listed in the sidebar in
+  `docs/.vitepress/config.mts`; links between pages are relative `.md` links so they work
+  on GitHub too. The implementation is authoritative: command output shown in the docs is
+  copied from real runs. User-visible changes go in `CHANGELOG.md` under Unreleased.
+- Hosting/deployment of the docs is not configured (no `base`, no workflow).
+- `README.md` is also the PyPI project page: link with absolute GitHub URLs, not
+  repository-relative paths.
 
 ## Development workflow
 
@@ -26,10 +32,18 @@ uv run mypy
 uv run pytest
 ```
 
+Documentation (Node.js 18+, dev-only):
+
+```bash
+npm ci
+npm run docs:dev      # local preview
+npm run docs:build    # production build; fails on dead links between pages
+```
+
 CI (`.github/workflows/ci.yml`) runs these on Ubuntu and macOS for Python 3.11–3.13 and
 installs the built wheel in a clean environment.
 
-Real-backend checks are opt-in and never part of the default run (docs/backends.md):
+Real-backend checks are opt-in and never part of the default run (docs/systemone.md):
 `uv run pytest -m real_kev` (a Kev server on 127.0.0.1:8009) and
 `uv run pytest -m real_jev` (`OPENROUTER_API_KEY`). Once selected, a missing prerequisite
 is a failure, not a skip. In CI they run only in `.github/workflows/real-backends.yml`.

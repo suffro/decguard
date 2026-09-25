@@ -3,7 +3,7 @@
 Kept dependency-free and deterministic: sums use :func:`math.fsum` over inputs in their
 given order, so the same results always produce bit-identical metrics. Definitions follow
 the usual conventions (scikit-learn for F1/NLL, Guo et al. 2017 for ECE); see
-docs/reports.md.
+docs/metrics.md.
 """
 
 from __future__ import annotations

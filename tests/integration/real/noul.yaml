@@ -1,4 +1,4 @@
-# Real-backend compatibility check (pytest -m real_kev / -m real_jev; docs/backends.md).
+# Real-backend compatibility check (pytest -m real_kev / -m real_jev; docs/systemone.md).
 # The default backend is a local Kev server; `jev` is TypeSafe's Jev on OpenRouter.
 schema_version: "0.1"
 
