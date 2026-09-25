@@ -83,7 +83,6 @@ export default defineConfig({
 
   // No `base` and no clean-URL rewrites: pages are `/quickstart.html`, and the sitemap lists them so.
   sitemap: { hostname },
-  lastUpdated: true,
   metaChunk: true,
 
   head: [
@@ -178,16 +177,6 @@ export default defineConfig({
     search: { provider: 'local' },
 
     socialLinks: [{ icon: 'github', link: repository }],
-
-    editLink: {
-      pattern: `${repository}/edit/main/docs/:path`,
-      text: 'Edit this page on GitHub',
-    },
-
-    lastUpdated: {
-      text: 'Last updated',
-      formatOptions: { dateStyle: 'medium' },
-    },
 
     docFooter: { prev: 'Previous', next: 'Next' },
 
