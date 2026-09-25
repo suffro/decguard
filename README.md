@@ -125,8 +125,9 @@ The full documentation is a [VitePress](https://vitepress.dev) site in [`docs/`]
 To browse it locally (Node.js 18+):
 
 ```bash
+cd docs
 npm ci
-npm run docs:dev
+npm run dev
 ```
 
 ## What DecGuard is not

@@ -10,8 +10,8 @@ versioned separately.
 
 ### Added
 
-- Documentation site built with VitePress in `docs/` (`npm run docs:dev`,
-  `npm run docs:build`): getting started, core concepts, testing, production, backends,
+- Documentation site built with VitePress in `docs/` (`npm run dev` and
+  `npm run build` in `docs/`): getting started, core concepts, testing, production, backends,
   CLI/contract/report reference, CI and architecture. New pages include a verified
   quickstart, a CLI reference and a complete contract reference; the backends guide is
   split into System One, HTTP and custom-backend pages. The README is now a short landing

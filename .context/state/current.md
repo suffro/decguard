@@ -42,7 +42,7 @@ attestations) with the same files on the GitHub Releases. The repository is publ
   metadata contains only compatible permissive licenses plus Certifi's MPL-2.0; `uv.lock`
   is current and every registry artifact is hash-pinned. No runtime dependency was added
   for the real backends.
-- Documentation: VitePress site in `docs/` (`npm run docs:build` fails on dead links);
+- Documentation: VitePress site in `docs/` (`cd docs && npm run build`, fails on dead links);
   existing page paths kept, backends split into `docs/systemone.md`, `docs/http.md` and
   `docs/custom-backends.md`, metrics moved to `docs/metrics.md`, the fuzzing workflow to
   `docs/fuzzing.md`.

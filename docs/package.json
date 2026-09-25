@@ -5,9 +5,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "docs:dev": "vitepress docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
   },
   "devDependencies": {
     "vitepress": "1.6.4"

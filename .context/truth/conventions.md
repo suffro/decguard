@@ -35,9 +35,10 @@ uv run pytest
 Documentation (Node.js 18+, dev-only):
 
 ```bash
+cd docs
 npm ci
-npm run docs:dev      # local preview
-npm run docs:build    # production build; fails on dead links between pages
+npm run dev      # local preview
+npm run build    # production build into docs/.vitepress/dist; fails on dead links
 ```
 
 CI (`.github/workflows/ci.yml`) runs these on Ubuntu and macOS for Python 3.11–3.13 and

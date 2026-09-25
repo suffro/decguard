@@ -52,7 +52,8 @@ explicit policies and SDK) are implemented.
 - `engine.py`: `run_test(mode="test"|"fuzz"|"all")` orchestration shared by CLI and API.
 - `docs/`: the user documentation as a VitePress site (`docs/.vitepress/config.mts`, a
   small theme extension in `docs/.vitepress/theme/`); Node tooling is dev-only
-  (`package.json`, `package-lock.json` at the root). Not part of the Python package.
+  (`docs/package.json`, `docs/package-lock.json`; `docs/` is a self-contained
+  Node project with `dev`, `build` and `preview` scripts). Not part of the Python package.
 - `cli/`: typer app with `validate`, `test` (`--all`), `fuzz`, `report`, `diff`, `replay`,
   offline `check`, and policy `run`.
 
