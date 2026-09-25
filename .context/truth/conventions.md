@@ -20,6 +20,15 @@
   on GitHub too. The implementation is authoritative: command output shown in the docs is
   copied from real runs. User-visible changes go in `CHANGELOG.md` under Unreleased.
 - Hosting/deployment of the docs is not configured (no `base`, no workflow).
+- The docs build writes a Markdown twin of each page at its source path, plus `llms.txt` and
+  `llms-full.txt` (`docs/.vitepress/llms.mjs`, from the `sidebar` const in `config.mts`); links
+  in them are relative to the site root because no hostname is set. Each page advertises its
+  twin with `<link rel="alternate" type="text/markdown">`, which `theme/PageActions.vue` (the
+  Markdown / Ask an AI buttons in the `doc-before` slot) reads. Twins exist only after
+  `npm run build`: test those buttons with `npm run preview`, not `npm run dev`.
+- Logos: `docs/public/static/svg/logo-{dark,light}.svg` (dark mark for light backgrounds),
+  `docs/public/static/svg/favicon.svg` (same mark, adapts to the color scheme) and
+  `docs/public/favicon.ico`.
 - `README.md` is also the PyPI project page: link with absolute GitHub URLs, not
   repository-relative paths.
 

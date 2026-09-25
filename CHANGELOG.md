@@ -16,6 +16,10 @@ versioned separately.
   quickstart, a CLI reference and a complete contract reference; the backends guide is
   split into System One, HTTP and custom-backend pages. The README is now a short landing
   page that links into these docs.
+- The documentation build also publishes a Markdown twin of every page (`/quickstart.md`
+  next to `/quickstart.html`), `/llms.txt` and `/llms-full.txt`. Every page except the home
+  page has buttons to copy or view its Markdown and to open it in Claude, ChatGPT, Mistral
+  or Perplexity. The site uses the DecGuard logo and favicon.
 
 ## [0.1.1] - 2026-09-25
 

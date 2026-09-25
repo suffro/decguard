@@ -47,6 +47,8 @@ attestations) with the same files on the GitHub Releases. The repository is publ
   `docs/custom-backends.md`, metrics moved to `docs/metrics.md`, the fuzzing workflow to
   `docs/fuzzing.md`.
   Quickstart output was produced by the PyPI package.
+  The build also emits Markdown page twins, `llms.txt` and `llms-full.txt`, and doc pages have
+  Markdown / Ask an AI buttons (ported from the Syngraphe docs); the site uses the DecGuard logo.
 - Release workflow: pushing a `vX.Y.Z` tag validates the tag against `pyproject.toml` and
   CHANGELOG, builds and checks the distributions once, publishes them to PyPI with Trusted
   Publishing (environment `pypi`, no stored token), then creates the GitHub Release with
@@ -56,7 +58,9 @@ attestations) with the same files on the GitHub Releases. The repository is publ
 
 - Merge the documentation PR, then choose and configure hosting for the VitePress site
   (separate task; the site has no `base` or deployment workflow). Once a public docs URL
-  exists, point `project.urls.Documentation` in `pyproject.toml` and the README at it.
+  exists, point `project.urls.Documentation` in `pyproject.toml` and the README at it, and
+  consider absolute URLs in `llms.txt` / twins, a sitemap, and serving twins on
+  `Accept: text/markdown` (Syngraphe does this with a Cloudflare Pages Function).
 
 ## Blockers
 
