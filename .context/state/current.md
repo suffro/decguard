@@ -45,13 +45,13 @@ merged to `main`. Nothing is tagged or published yet.
 
 ## Next
 
-- Merge the release-workflow PR, then complete the one-time setup: a PyPI pending trusted
-  publisher (`suffro`/`decguard`, `release.yml`, environment `pypi`) and the GitHub `pypi`
-  environment.
+- Merge the release-workflow PR, then add the PyPI pending trusted publisher
+  (`suffro`/`decguard`, `release.yml`, environment `pypi`). GitHub creates the `pypi`
+  environment on the first run; tag restrictions/reviewers on it are optional hardening.
 - Then push the `v0.1.0` tag on a `main` commit with green CI and real-backend runs.
 
 ## Blockers
 
-- The PyPI trusted publisher and the GitHub `pypi` environment must exist before the tag
-  is pushed; without them the publish job fails. To re-run the real-backend check,
+- The PyPI trusted publisher must exist before the tag is pushed; without it the publish
+  job fails. To re-run the real-backend check,
   dispatch `real-backends.yml` (it needs the repository secret `OPENROUTER_API_KEY`).

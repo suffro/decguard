@@ -71,13 +71,16 @@ A pushed `vX.Y.Z` tag is the release. To cut one:
    PyPI never accepts the same version twice.
 
 The workflow uses PyPI Trusted Publishing (OIDC), so no PyPI token or password is stored
-anywhere. It needs this one-time setup:
+anywhere. The one required setup is on PyPI: a trusted publisher for the `decguard` project
+(a *pending* publisher before the first upload) with owner `suffro`, repository `decguard`,
+workflow `release.yml` and environment `pypi`.
 
-- On PyPI, a trusted publisher for the `decguard` project (a *pending* publisher before the
-  first upload): owner `suffro`, repository `decguard`, workflow `release.yml`, environment
-  `pypi`.
-- On GitHub, an environment named `pypi` (Settings → Environments). Limit its deployments
-  to `v*.*.*` tags, and consider adding required reviewers.
+GitHub creates the `pypi` environment on the first run. Optionally, harden it in
+Settings → Environments → `pypi`:
+
+- Limit deployments to `v*.*.*` tags, so a modified `release.yml` pushed to a branch cannot
+  publish.
+- Add required reviewers, so every upload waits for a manual approval.
 
 The release workflow never receives `OPENROUTER_API_KEY` or any other repository secret, and
 does not run the paid real-backend tests.
