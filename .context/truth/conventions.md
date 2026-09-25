@@ -19,11 +19,14 @@
   `docs/.vitepress/config.mts`; links between pages are relative `.md` links so they work
   on GitHub too. The implementation is authoritative: command output shown in the docs is
   copied from real runs. User-visible changes go in `CHANGELOG.md` under Unreleased.
-- Hosting/deployment of the docs is not configured (no `base`, no workflow).
+- The docs' production origin is `https://decguard.com` (the `hostname` const in
+  `docs/.vitepress/config.mts`; also hard-coded in `docs/public/robots.txt`). It feeds the
+  sitemap, canonical links and the Markdown surface. Deployment is not configured (no `base`,
+  no workflow, no clean URLs: pages are `/name.html`).
 - The docs build writes a Markdown twin of each page at its source path, plus `llms.txt` and
-  `llms-full.txt` (`docs/.vitepress/llms.mjs`, from the `sidebar` const in `config.mts`); links
-  in them are relative to the site root because no hostname is set. Each page advertises its
-  twin with `<link rel="alternate" type="text/markdown">`, which `theme/PageActions.vue` (the
+  `llms-full.txt` (`docs/.vitepress/llms.mjs`, from the `sidebar` const in `config.mts`),
+  with absolute links on the production origin. Each page advertises its twin with
+  `<link rel="alternate" type="text/markdown">`, which `theme/PageActions.vue` (the
   Markdown / Ask an AI buttons in the `doc-before` slot) reads. Twins exist only after
   `npm run build`: test those buttons with `npm run preview`, not `npm run dev`.
 - Logos: `docs/public/static/svg/logo-{dark,light}.svg` (dark mark for light backgrounds),

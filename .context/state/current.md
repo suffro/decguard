@@ -5,7 +5,8 @@
 Documentation site (branch `docs/vitepress`): `docs/` is now a VitePress site with
 getting started, concepts, testing, production, backends, reference, CI and architecture
 sections; the README is a short landing page (absolute GitHub links, since it is the PyPI
-project page). Hosting/deployment of the site is deliberately not configured yet.
+project page). The site's domain is `https://decguard.com` (sitemap, robots.txt, canonical
+links); deployment is not configured yet.
 
 Released: `0.1.0` (tag `v0.1.0` on `ca2373a`) and `0.1.1` (tag `v0.1.1` on `20b6b02`,
 README fix only), both published to PyPI by `release.yml` (Trusted Publishing,
@@ -56,11 +57,12 @@ attestations) with the same files on the GitHub Releases. The repository is publ
 
 ## Next
 
-- Merge the documentation PR, then choose and configure hosting for the VitePress site
-  (separate task; the site has no `base` or deployment workflow). Once a public docs URL
-  exists, point `project.urls.Documentation` in `pyproject.toml` and the README at it, and
-  consider absolute URLs in `llms.txt` / twins, a sitemap, and serving twins on
-  `Accept: text/markdown` (Syngraphe does this with a Cloudflare Pages Function).
+- Merge the documentation PR, then configure hosting and deployment for `decguard.com`
+  (the site has no deployment workflow). Once it is live, point
+  `project.urls.Documentation` in `pyproject.toml` and the README at it, and consider
+  serving twins on `Accept: text/markdown` (Syngraphe does this with a Cloudflare Pages
+  Function). If the host rewrites `.html` to clean URLs, switch on `cleanUrls` so the
+  sitemap and canonical links match the served URLs.
 
 ## Blockers
 

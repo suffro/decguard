@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { defineConfig, type HeadConfig } from 'vitepress'
-import { recordPage, writeLlmsFiles } from './llms.mjs'
+import { pageFileFor, recordPage, writeLlmsFiles } from './llms.mjs'
 
 // The nav shows the package version from pyproject.toml, so it follows each release.
 const pyproject = readFileSync(new URL('../../pyproject.toml', import.meta.url), 'utf8')
 const version = pyproject.match(/^version = "([^"]+)"/m)?.[1] ?? 'unknown'
+
+// The production origin. The sitemap, the canonical links, robots.txt and the Markdown surface
+// (llms.txt, the page twins) all name pages with it. No trailing slash.
+const hostname = 'https://decguard.com'
 
 const repository = 'https://github.com/suffro/decguard'
 const description =
@@ -77,7 +81,8 @@ export default defineConfig({
   titleTemplate: ':title · DecGuard',
   description,
 
-  // Hosting-neutral: no `base`, no sitemap hostname and no clean-URL rewrites.
+  // No `base` and no clean-URL rewrites: pages are `/quickstart.html`, and the sitemap lists them so.
+  sitemap: { hostname },
   lastUpdated: true,
   metaChunk: true,
 
@@ -101,17 +106,19 @@ export default defineConfig({
     theme: { light: 'github-light', dark: 'github-dark' },
   },
 
-  transformPageData(pageData, { siteConfig }) {
+  transformPageData(pageData) {
     // Recording the page is what feeds llms.txt and the Markdown twins; see ./llms.mjs.
     recordPage(pageData)
 
-    // The Markdown twin of this page, at its source path. `PageActions.vue` reads this link rather
-    // than deriving the path a second time.
     const head: HeadConfig[] = (pageData.frontmatter.head ??= [])
-    head.push([
-      'link',
-      { rel: 'alternate', type: 'text/markdown', href: `${siteConfig.site.base}${pageData.relativePath}` },
-    ])
+    head.push(
+      // The same URL the sitemap lists, so a preview deployment is never indexed as a second copy.
+      ['link', { rel: 'canonical', href: `${hostname}/${pageFileFor(pageData.relativePath)}` }],
+      ['meta', { property: 'og:url', content: `${hostname}/${pageFileFor(pageData.relativePath)}` }],
+      // The Markdown twin of this page, at its source path. `PageActions.vue` reads this link rather
+      // than deriving the path a second time.
+      ['link', { rel: 'alternate', type: 'text/markdown', href: `${hostname}/${pageData.relativePath}` }],
+    )
   },
 
   // The Markdown surface, written after the pages are rendered: /llms.txt, /llms-full.txt and one
@@ -120,6 +127,7 @@ export default defineConfig({
     const written = await writeLlmsFiles({
       outDir: siteConfig.outDir,
       srcDir: siteConfig.srcDir,
+      hostname,
       version,
       repository,
       sidebar,

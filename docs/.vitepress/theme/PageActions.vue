@@ -78,8 +78,9 @@ let flashTimer
 function readTwin() {
   const link = document.querySelector('link[rel="alternate"][type="text/markdown"]')
   twin.value = link?.href ?? ''
-  // The site declares no hostname, so the absolute URL the services get is resolved against
-  // wherever the site is being served; our own fetch and `View` use the same-origin path.
+  // Absolute for the services — a model cannot fetch someone's localhost — but same-origin for our
+  // own fetch and for `View`, which would otherwise leave the site for the production copy of the
+  // page being read.
   local.value = twin.value ? new URL(twin.value).pathname : ''
 }
 

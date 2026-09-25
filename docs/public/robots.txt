@@ -1,0 +1,15 @@
+# https://decguard.com — DecGuard documentation
+
+User-agent: *
+Allow: /
+Disallow: /404.html
+
+# For readers that would rather not crawl every page to answer one question:
+#
+#   https://decguard.com/llms.txt       every page, with a one-line description of each
+#   https://decguard.com/llms-full.txt  the same pages' full text, in one document
+#
+# Any single page is also available as Markdown at its source path, for example
+# https://decguard.com/quickstart.md next to https://decguard.com/quickstart.html.
+
+Sitemap: https://decguard.com/sitemap.xml
