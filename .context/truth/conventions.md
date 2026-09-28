@@ -22,7 +22,8 @@
 - The docs' production origin is `https://decguard.com` (the `hostname` const in
   `docs/.vitepress/config.mts`; also hard-coded in `docs/public/robots.txt`). It feeds the
   sitemap, canonical links and the Markdown surface. Deployment is not configured (no `base`,
-  no workflow, no clean URLs: pages are `/name.html`).
+  no workflow). `cleanUrls` is on: pages are `/name` (the build writes `name.html`, which
+  Cloudflare Pages serves at `/name`).
 - The docs build writes a Markdown twin of each page at its source path, plus `llms.txt` and
   `llms-full.txt` (`docs/.vitepress/llms.mjs`, from the `sidebar` const in `config.mts`),
   with absolute links on the production origin. Each page advertises its twin with

@@ -66,8 +66,8 @@ attestations) with the same files on the GitHub Releases. The repository is publ
   (the site has no deployment workflow). Once it is live, point
   `project.urls.Documentation` in `pyproject.toml` and the README at it, and consider
   serving twins on `Accept: text/markdown` (Syngraphe does this with a Cloudflare Pages
-  Function). If the host rewrites `.html` to clean URLs, switch on `cleanUrls` so the
-  sitemap and canonical links match the served URLs.
+  Function). `cleanUrls` is on and assumes a host that serves `name.html` at `/name`
+  (Cloudflare Pages does); on another host, add that rewrite.
 
 ## Blockers
 

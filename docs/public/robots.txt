@@ -2,7 +2,7 @@
 
 User-agent: *
 Allow: /
-Disallow: /404.html
+Disallow: /404
 
 # For readers that would rather not crawl every page to answer one question:
 #
@@ -10,6 +10,6 @@ Disallow: /404.html
 #   https://decguard.com/llms-full.txt  the same pages' full text, in one document
 #
 # Any single page is also available as Markdown at its source path, for example
-# https://decguard.com/quickstart.md next to https://decguard.com/quickstart.html.
+# https://decguard.com/quickstart.md next to https://decguard.com/quickstart.
 
 Sitemap: https://decguard.com/sitemap.xml

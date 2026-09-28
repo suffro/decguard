@@ -81,7 +81,10 @@ export default defineConfig({
   titleTemplate: ':title · DecGuard',
   description,
 
-  // No `base` and no clean-URL rewrites: pages are `/quickstart.html`, and the sitemap lists them so.
+  // Pages are `/quickstart`, not `/quickstart.html`: links, the sitemap and canonical URLs drop the
+  // extension. The build still writes `quickstart.html`; Cloudflare Pages serves it at `/quickstart`
+  // and redirects the `.html` form there.
+  cleanUrls: true,
   sitemap: { hostname },
   metaChunk: true,
 

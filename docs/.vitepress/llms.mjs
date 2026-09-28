@@ -33,10 +33,10 @@ export function recordPage(pageData) {
   })
 }
 
-/** The rendered page for a source path, relative to the site root, as VitePress writes it without
- *  clean URLs and lists it in the sitemap: `quickstart.md` → `quickstart.html`, `index.md` → ``. */
+/** The rendered page's URL path for a source path, relative to the site root, as VitePress lists it
+ *  in the sitemap with clean URLs: `quickstart.md` → `quickstart`, `index.md` → ``. */
 export const pageFileFor = (relativePath) =>
-  relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html')
+  relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
 
 /** Sidebar links are `/quickstart`; recorded pages are `quickstart.md`. */
 const sourceOf = (link) => `${link.replace(/^\//, '').replace(/\/$/, '/index') || 'index'}.md`
@@ -98,7 +98,7 @@ function renderIndex({ hostname, version, repository, sidebar }) {
     ...header(version, repository),
     `Every page below, concatenated as one document: ${hostname}/llms-full.txt`,
     '',
-    'Each link is the page as Markdown; the rendered page is at the same path with `.html` in place of `.md`.',
+    'Each link is the page as Markdown; the rendered page is at the same path without `.md`.',
     '',
   ]
 
